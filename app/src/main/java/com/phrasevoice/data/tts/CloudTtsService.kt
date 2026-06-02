@@ -20,10 +20,13 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import okhttp3.HttpUrl
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
+import kotlin.math.roundToInt
 
 class CloudTtsService(
     private val audioFileStore: AudioFileStore,
@@ -42,6 +45,7 @@ class CloudTtsService(
         )
         when (runtimeConfig.config.providerId) {
             ProviderConfigRepository.OPENAI -> synthesizeOpenAiCompatible(request, runtimeConfig, cache)
+            ProviderConfigRepository.EDGE_TTS_FORWARDER -> synthesizeEdgeTtsForwarder(request, runtimeConfig, cache)
             ProviderConfigRepository.CUSTOM_HTTP -> synthesizeCustomHttp(request, runtimeConfig, cache)
             else -> TtsResult.Error("该 Provider 暂未接入。")
         }
@@ -79,6 +83,35 @@ class CloudTtsService(
             .build()
 
         return executeAudioRequest(httpRequest, target.file, target.uri, target.mimeType)
+    }
+
+    private fun synthesizeEdgeTtsForwarder(
+        request: TtsRequest,
+        runtimeConfig: RuntimeProviderConfig,
+        cache: Boolean,
+    ): TtsResult {
+        val config = runtimeConfig.config
+        val baseUrl = config.baseUrl?.takeIf { it.isNotBlank() }
+            ?: return TtsResult.Error("请先配置 Edge TTS Forwarder Base URL。")
+        val endpoint = edgeForwarderEndpoint(baseUrl)
+            ?: return TtsResult.Error("Edge TTS Forwarder Base URL 无效。")
+        val format = AudioFormat.MP3
+        val target = audioFileStore.createTarget(format, cache = cache)
+        val url = endpoint.newBuilder()
+            .addQueryParameter("voice", request.voiceId ?: config.defaultVoice ?: DEFAULT_EDGE_FORWARDER_VOICE)
+            .addQueryParameter("volume", edgeVolume(request.volume).toString())
+            .addQueryParameter("rate", edgeProsodyPercent(request.speed).toString())
+            .addQueryParameter("pitch", edgeProsodyPercent(request.pitch).toString())
+            .addQueryParameter("text", request.text)
+            .build()
+        AppLogger.i(TAG, "edge forwarder request url=${url.toString().safeUrlForLog()}")
+
+        val builder = Request.Builder().url(url).get()
+        runtimeConfig.apiKey
+            ?.takeIf { it.isNotBlank() }
+            ?.let { token -> builder.addHeader("Authorization", "Bearer $token") }
+
+        return executeAudioRequest(builder.build(), target.file, target.uri, target.mimeType)
     }
 
     private fun synthesizeCustomHttp(
@@ -226,9 +259,29 @@ class CloudTtsService(
         return current.jsonPrimitive.contentOrNull
     }
 
+    private fun edgeForwarderEndpoint(baseUrl: String): HttpUrl? {
+        val parsed = baseUrl.trim().toHttpUrlOrNull() ?: return null
+        if (parsed.encodedPath.trimEnd('/').endsWith("/api/text-to-speech")) {
+            return parsed
+        }
+        val rootPath = parsed.encodedPath.trimEnd('/')
+        val apiPath = if (rootPath.isBlank()) {
+            "/api/text-to-speech"
+        } else {
+            "$rootPath/api/text-to-speech"
+        }
+        return parsed.newBuilder().encodedPath(apiPath).build()
+    }
+
+    private fun edgeProsodyPercent(value: Float): Int =
+        ((value.coerceIn(0.5f, 2.0f) - 1.0f) * 100).roundToInt().coerceIn(-100, 100)
+
+    private fun edgeVolume(value: Float): Int =
+        (value.coerceIn(0.0f, 1.0f) * 100).roundToInt().coerceIn(0, 100)
+
     private fun okhttp3.Response.toTtsError(): TtsResult.Error {
         val message = when (code) {
-            401 -> "认证失败：请检查 API Key。"
+            401 -> "认证失败：请检查 API Key 或 Token。"
             402 -> "账户余额或配额不足。"
             404 -> "接口地址不存在，请检查 Base URL。"
             429 -> "请求过于频繁或额度耗尽。"
@@ -241,6 +294,8 @@ class CloudTtsService(
 
     companion object {
         private const val TAG = "CloudTtsService"
+        private const val DEFAULT_EDGE_FORWARDER_VOICE =
+            "Microsoft Server Speech Text to Speech Voice (zh-CN, XiaoxiaoNeural)"
         private val JSON_MEDIA_TYPE = "application/json; charset=utf-8".toMediaType()
     }
 }

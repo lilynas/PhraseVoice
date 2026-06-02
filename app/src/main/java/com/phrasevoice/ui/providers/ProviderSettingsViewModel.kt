@@ -40,6 +40,9 @@ data class ProviderSettingsUiState(
 
     val isCustomHttp: Boolean
         get() = selectedProviderId == ProviderConfigRepository.CUSTOM_HTTP
+
+    val isEdgeForwarder: Boolean
+        get() = selectedProviderId == ProviderConfigRepository.EDGE_TTS_FORWARDER
 }
 
 class ProviderSettingsViewModel(
@@ -111,6 +114,7 @@ class ProviderSettingsViewModel(
     fun saveAndTestVoice() {
         val state = uiState.value
         if (state.selectedProviderId != ProviderConfigRepository.OPENAI &&
+            state.selectedProviderId != ProviderConfigRepository.EDGE_TTS_FORWARDER &&
             state.selectedProviderId != ProviderConfigRepository.CUSTOM_HTTP
         ) {
             _uiState.update { it.copy(savedMessage = "当前 Provider 不需要云端试听") }

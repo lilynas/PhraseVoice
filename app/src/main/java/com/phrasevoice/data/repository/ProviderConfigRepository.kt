@@ -106,6 +106,7 @@ class ProviderConfigRepository(
 
         const val ANDROID_SYSTEM = "android_system"
         const val OPENAI = "openai"
+        const val EDGE_TTS_FORWARDER = "edge_tts_forwarder"
         const val GEMINI = "gemini"
         const val MIMO = "mimo"
         const val CUSTOM_HTTP = "custom_http"
@@ -122,6 +123,12 @@ class ProviderConfigRepository(
                     baseUrl = "https://api.openai.com/v1/audio/speech",
                     model = "gpt-4o-mini-tts",
                     defaultVoice = "alloy",
+                ),
+                ProviderConfig(
+                    providerId = EDGE_TTS_FORWARDER,
+                    enabled = false,
+                    baseUrl = "https://tts.shirone.de/api/text-to-speech",
+                    defaultVoice = "Microsoft Server Speech Text to Speech Voice (zh-CN, XiaoxiaoNeural)",
                 ),
                 ProviderConfig(
                     providerId = GEMINI,

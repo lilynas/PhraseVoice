@@ -13,11 +13,21 @@
 ## Phase 2 Cloud Providers
 
 - Implement `OpenAiTtsProvider` with `gpt-4o-mini-tts` as the default model.
+- Implement `EdgeTtsForwarderProvider` for user-managed `ms-ra-forwarder` instances.
 - Implement `GeminiTtsProvider` with isolated response parsing.
 - Implement `MiMoTtsProvider` for Xiaomi MiMo V2.5 TTS using the official chat completions speech synthesis API.
 - Add MiMo VoiceDesign character voices so users can create, preview, and reuse custom role voices from text descriptions.
 - Implement `CustomHttpTtsProvider` for OpenAI-compatible services, user-managed Edge TTS servers, and other TTS endpoints.
 - Add secure provider settings for API keys, base URLs, headers, models, voices, and request templates.
+
+### Edge TTS Forwarder Plan
+
+- Use the `ms-ra-forwarder` `/api/text-to-speech` endpoint as a first-class provider.
+- Default endpoint: `https://tts.shirone.de/api/text-to-speech`.
+- Request shape: send `voice`, `volume`, `rate`, `pitch`, and `text` as GET query parameters.
+- Authentication: when the deployment has `TOKEN` configured, send `Authorization: Bearer <token>` using the saved Token field.
+- Initial voice list: include common Chinese and English Microsoft voice names; users can still paste a full Microsoft voice name as the default voice.
+- Keep this provider separate from Custom HTTP so common Edge TTS usage requires less manual template editing.
 
 ### MiMo Provider Plan
 

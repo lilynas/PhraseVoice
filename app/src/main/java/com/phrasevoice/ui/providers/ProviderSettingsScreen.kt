@@ -124,32 +124,47 @@ fun ProviderSettingsScreen(
                         OutlinedTextField(
                             value = state.apiKeyDraft,
                             onValueChange = onApiKeyChange,
-                            label = { Text(if (state.hasSavedApiKey) "API Key（已保存，留空不改）" else "API Key") },
+                            label = {
+                                Text(
+                                    when {
+                                        state.isEdgeForwarder && state.hasSavedApiKey -> "Token（已保存，留空不改）"
+                                        state.isEdgeForwarder -> "Token（可选）"
+                                        state.hasSavedApiKey -> "API Key（已保存，留空不改）"
+                                        else -> "API Key"
+                                    },
+                                )
+                            },
                             singleLine = true,
                             visualTransformation = PasswordVisualTransformation(),
                             modifier = Modifier.fillMaxWidth(),
                         )
 
+                        if (state.isEdgeForwarder) {
+                            Text("使用 ms-ra-forwarder 的 /api/text-to-speech 接口。Base URL 可填站点根地址或完整接口地址；如果实例启用了 TOKEN，这里填 Token。")
+                        }
+
                         OutlinedTextField(
                             value = state.baseUrlDraft,
                             onValueChange = onBaseUrlChange,
-                            label = { Text("Base URL") },
+                            label = { Text(if (state.isEdgeForwarder) "Forwarder URL" else "Base URL") },
                             singleLine = true,
                             modifier = Modifier.fillMaxWidth(),
                         )
 
-                        OutlinedTextField(
-                            value = state.modelDraft,
-                            onValueChange = onModelChange,
-                            label = { Text("模型") },
-                            singleLine = true,
-                            modifier = Modifier.fillMaxWidth(),
-                        )
+                        if (!state.isEdgeForwarder) {
+                            OutlinedTextField(
+                                value = state.modelDraft,
+                                onValueChange = onModelChange,
+                                label = { Text("模型") },
+                                singleLine = true,
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                        }
 
                         OutlinedTextField(
                             value = state.voiceDraft,
                             onValueChange = onVoiceChange,
-                            label = { Text("默认 Voice") },
+                            label = { Text(if (state.isEdgeForwarder) "默认 Voice（完整 Microsoft voice name）" else "默认 Voice") },
                             singleLine = true,
                             modifier = Modifier.fillMaxWidth(),
                         )
@@ -222,6 +237,7 @@ private fun ProviderSummaryCard(
 private fun ProviderIcon(providerId: String) {
     val icon = when (providerId) {
         ProviderConfigRepository.ANDROID_SYSTEM -> Icons.Outlined.PhoneAndroid
+        ProviderConfigRepository.EDGE_TTS_FORWARDER -> Icons.Outlined.Cloud
         ProviderConfigRepository.CUSTOM_HTTP -> Icons.Outlined.Tune
         else -> Icons.Outlined.Cloud
     }
@@ -335,6 +351,7 @@ private fun providerLabel(providerId: String): String =
     when (providerId) {
         ProviderConfigRepository.ANDROID_SYSTEM -> "Android System TTS"
         ProviderConfigRepository.OPENAI -> "OpenAI-compatible TTS"
+        ProviderConfigRepository.EDGE_TTS_FORWARDER -> "Edge TTS Forwarder"
         ProviderConfigRepository.GEMINI -> "Gemini TTS"
         ProviderConfigRepository.MIMO -> "MiMo TTS"
         ProviderConfigRepository.CUSTOM_HTTP -> "Custom HTTP TTS"

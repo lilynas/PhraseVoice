@@ -378,6 +378,7 @@ class HomeViewModel(
             }
 
             ProviderConfigRepository.OPENAI,
+            ProviderConfigRepository.EDGE_TTS_FORWARDER,
             ProviderConfigRepository.CUSTOM_HTTP -> {
                 val settings = settingsRepository.currentSettings()
                 if (playAudioFile && !settings.keepAudioCache) {
@@ -425,6 +426,7 @@ class HomeViewModel(
             name = when (providerId) {
                 ProviderConfigRepository.ANDROID_SYSTEM -> "Android System TTS"
                 ProviderConfigRepository.OPENAI -> "OpenAI-compatible TTS"
+                ProviderConfigRepository.EDGE_TTS_FORWARDER -> "Edge TTS Forwarder"
                 ProviderConfigRepository.GEMINI -> "Gemini TTS"
                 ProviderConfigRepository.MIMO -> "MiMo TTS"
                 ProviderConfigRepository.CUSTOM_HTTP -> "Custom HTTP TTS"
@@ -459,6 +461,7 @@ class HomeViewModel(
             }
 
             ProviderConfigRepository.OPENAI -> openAiVoices()
+            ProviderConfigRepository.EDGE_TTS_FORWARDER -> edgeForwarderVoices()
             ProviderConfigRepository.MIMO -> mimoVoices()
             ProviderConfigRepository.CUSTOM_HTTP -> {
                 val voice = providerConfigs
@@ -479,6 +482,43 @@ class HomeViewModel(
 
             else -> emptyList()
         }
+
+    private fun edgeForwarderVoices(): List<TtsVoice> {
+        val providerId = ProviderConfigRepository.EDGE_TTS_FORWARDER
+        val configured = providerConfigs.firstOrNull { it.providerId == providerId }?.defaultVoice
+        val defaults = listOf(
+            "Microsoft Server Speech Text to Speech Voice (zh-CN, XiaoxiaoNeural)" to "晓晓 zh-CN",
+            "Microsoft Server Speech Text to Speech Voice (zh-CN, XiaoyiNeural)" to "晓伊 zh-CN",
+            "Microsoft Server Speech Text to Speech Voice (zh-CN, YunjianNeural)" to "云健 zh-CN",
+            "Microsoft Server Speech Text to Speech Voice (zh-CN, YunxiNeural)" to "云希 zh-CN",
+            "Microsoft Server Speech Text to Speech Voice (zh-CN, YunxiaNeural)" to "云夏 zh-CN",
+            "Microsoft Server Speech Text to Speech Voice (zh-CN, YunyangNeural)" to "云扬 zh-CN",
+            "Microsoft Server Speech Text to Speech Voice (zh-CN-liaoning, XiaobeiNeural)" to "晓北 辽宁",
+            "Microsoft Server Speech Text to Speech Voice (zh-CN-shaanxi, XiaoniNeural)" to "晓妮 陕西",
+            "Microsoft Server Speech Text to Speech Voice (zh-HK, HiuGaaiNeural)" to "晓佳 zh-HK",
+            "Microsoft Server Speech Text to Speech Voice (zh-HK, HiuMaanNeural)" to "晓曼 zh-HK",
+            "Microsoft Server Speech Text to Speech Voice (zh-HK, WanLungNeural)" to "云龙 zh-HK",
+            "Microsoft Server Speech Text to Speech Voice (zh-TW, HsiaoChenNeural)" to "晓臻 zh-TW",
+            "Microsoft Server Speech Text to Speech Voice (zh-TW, HsiaoYuNeural)" to "晓雨 zh-TW",
+            "Microsoft Server Speech Text to Speech Voice (zh-TW, YunJheNeural)" to "云哲 zh-TW",
+            "Microsoft Server Speech Text to Speech Voice (en-US, JennyNeural)" to "Jenny en-US",
+            "Microsoft Server Speech Text to Speech Voice (en-US, GuyNeural)" to "Guy en-US",
+        )
+        val configuredVoice = configured
+            ?.takeIf { it.isNotBlank() }
+            ?.takeUnless { voice -> defaults.any { it.first == voice } }
+            ?.let { it to it }
+        return (listOfNotNull(configuredVoice) + defaults)
+            .distinctBy { it.first }
+            .map { (voice, name) ->
+                TtsVoice(
+                    id = voice,
+                    name = name,
+                    language = voice.substringAfter("(", "").substringBefore(",").takeIf { it.isNotBlank() },
+                    providerId = providerId,
+                )
+            }
+    }
 
     private fun mimoVoices(): List<TtsVoice> {
         val providerId = ProviderConfigRepository.MIMO
