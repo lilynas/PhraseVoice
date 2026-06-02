@@ -162,6 +162,47 @@ class PhraseRepository(
         }
     }
 
+    suspend fun exportLibraryJson(): String {
+        val library = library.first()
+        return PhraseLibraryBackupCodec.encode(
+            groups = library.groups,
+            phrases = library.phrases,
+            exportedAt = System.currentTimeMillis(),
+        )
+    }
+
+    suspend fun importLibraryJson(json: String): PhraseImportResult {
+        val backup = PhraseLibraryBackupCodec.decode(json)
+        var importResult = PhraseImportResult(
+            importedGroups = 0,
+            importedPhrases = 0,
+            skippedPhrases = 0,
+        )
+
+        dataStore.edit { preferences ->
+            val currentGroups = PhraseVoiceJson.decode(
+                preferences[PhraseVoicePreferenceKeys.PHRASE_GROUPS],
+                defaultGroups(),
+            )
+            val currentPhrases = PhraseVoiceJson.decode<List<Phrase>>(
+                preferences[PhraseVoicePreferenceKeys.PHRASES],
+                emptyList(),
+            )
+            val merged = PhraseLibraryImporter.merge(
+                currentGroups = currentGroups,
+                currentPhrases = currentPhrases,
+                backup = backup,
+                now = System.currentTimeMillis(),
+            )
+
+            preferences[PhraseVoicePreferenceKeys.PHRASE_GROUPS] = PhraseVoiceJson.encode(merged.groups)
+            preferences[PhraseVoicePreferenceKeys.PHRASES] = PhraseVoiceJson.encode(merged.phrases)
+            importResult = merged.importResult
+        }
+
+        return importResult
+    }
+
     companion object {
         const val DEFAULT_GROUP_ID = "default"
 

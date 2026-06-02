@@ -106,6 +106,10 @@ fun PhraseVoiceRoot(container: AppContainer) {
                 onSpeakPhrase = { phrase ->
                     homeViewModel.speakPhrase(phrase.id, phrase.text)
                 },
+                onBuildExportJson = libraryViewModel::buildExportJson,
+                onImportJson = libraryViewModel::importJson,
+                onExportCompleted = libraryViewModel::markExportSuccess,
+                onFileActionMessage = libraryViewModel::showFileActionMessage,
                 modifier = modifier,
             )
 

@@ -7,6 +7,7 @@
 - Implement the `TtsProvider` abstraction.
 - Implement `AndroidSystemTtsProvider` with `speak`, `stop`, voice listing, and WAV export.
 - Implement phrase CRUD, favorites, search, quick speak, and history.
+- Add phrase JSON import/export with merge import and duplicate skipping. Done.
 - Store ordinary app data in DataStore as JSON.
 - Verify builds through GitHub Actions CI.
 
@@ -51,6 +52,6 @@
 ## Phase 3 Polish
 
 - Add audio cache controls and sharing.
-- Add import/export for phrases as JSON.
+- Add import/export for phrases as JSON. Done.
 - Expand unit and UI state tests.
 - Add screenshots and release docs.

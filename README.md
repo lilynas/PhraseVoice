@@ -9,6 +9,7 @@ Phase 1 MVP is in progress:
 - Android + Kotlin + Jetpack Compose + Material 3
 - Local Android `TextToSpeech` provider
 - Phrase library with add, edit, delete, favorite, search, and quick speak
+- Phrase JSON import/export with merge import and duplicate skipping
 - History records with replay and save-as-phrase
 - Audio export through Android system TTS as WAV
 - Provider abstraction ready for cloud providers
@@ -17,7 +18,7 @@ Phase 1 MVP is in progress:
 - Xiaomi MiMo V2.5 TTS provider with preset voices and an initial VoiceDesign description mode
 - GitHub Actions CI for build and unit test verification
 
-Phase 2 will continue with multi-preset MiMo character voices, phrase import/export, and broader Custom HTTP presets.
+Phase 2 will continue with multi-preset MiMo character voices and broader Custom HTTP presets.
 
 ## Build Verification
 

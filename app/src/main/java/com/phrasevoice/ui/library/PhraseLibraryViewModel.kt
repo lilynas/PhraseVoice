@@ -20,6 +20,7 @@ data class PhraseLibraryUiState(
     val titleDraft: String = "",
     val textDraft: String = "",
     val favoriteDraft: Boolean = false,
+    val fileActionMessage: String? = null,
 ) {
     val filteredPhrases: List<Phrase>
         get() = phrases.filter { phrase ->
@@ -131,5 +132,54 @@ class PhraseLibraryViewModel(
         viewModelScope.launch {
             phraseRepository.toggleFavorite(id)
         }
+    }
+
+    suspend fun buildExportJson(): String =
+        phraseRepository.exportLibraryJson()
+
+    fun importJson(json: String) {
+        viewModelScope.launch {
+            val result = runCatching { phraseRepository.importLibraryJson(json) }
+            _uiState.update { state ->
+                state.copy(
+                    fileActionMessage = result.fold(
+                        onSuccess = { importResult ->
+                            when {
+                                importResult.importedPhrases > 0 -> {
+                                    val groupText = if (importResult.importedGroups > 0) {
+                                        "，新增 ${importResult.importedGroups} 个分组"
+                                    } else {
+                                        ""
+                                    }
+                                    val skippedText = if (importResult.skippedPhrases > 0) {
+                                        "，跳过 ${importResult.skippedPhrases} 条重复/空内容"
+                                    } else {
+                                        ""
+                                    }
+                                    "已导入 ${importResult.importedPhrases} 条常用语$groupText$skippedText。"
+                                }
+
+                                importResult.skippedPhrases > 0 -> "没有新的常用语可导入，已跳过重复/空内容。"
+                                else -> "导入文件里没有常用语。"
+                            }
+                        },
+                        onFailure = { throwable ->
+                            "导入失败：${throwable.message ?: "文件格式不正确"}"
+                        },
+                    ),
+                )
+            }
+        }
+    }
+
+    fun markExportSuccess() {
+        val phraseCount = uiState.value.phrases.size
+        _uiState.update {
+            it.copy(fileActionMessage = "已导出 $phraseCount 条常用语。")
+        }
+    }
+
+    fun showFileActionMessage(message: String) {
+        _uiState.update { it.copy(fileActionMessage = message) }
     }
 }

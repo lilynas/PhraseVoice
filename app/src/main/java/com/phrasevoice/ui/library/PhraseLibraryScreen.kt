@@ -1,5 +1,9 @@
 package com.phrasevoice.ui.library
 
+import android.content.Context
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -13,6 +17,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Edit
+import androidx.compose.material.icons.outlined.FileDownload
+import androidx.compose.material.icons.outlined.FileUpload
 import androidx.compose.material.icons.outlined.PlayArrow
 import androidx.compose.material.icons.outlined.Star
 import androidx.compose.material.icons.outlined.StarBorder
@@ -23,15 +29,23 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.phrasevoice.data.model.Phrase
+import kotlinx.coroutines.launch
 
 @Composable
 fun PhraseLibraryScreen(
@@ -48,8 +62,46 @@ fun PhraseLibraryScreen(
     onDismissDialog: () -> Unit,
     onSaveDialog: () -> Unit,
     onSpeakPhrase: (Phrase) -> Unit,
+    onBuildExportJson: suspend () -> String,
+    onImportJson: (String) -> Unit,
+    onExportCompleted: () -> Unit,
+    onFileActionMessage: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var pendingExportJson by remember { mutableStateOf<String?>(null) }
+
+    val exportLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.CreateDocument("application/json"),
+    ) { uri: Uri? ->
+        val json = pendingExportJson
+        pendingExportJson = null
+        if (uri == null || json == null) return@rememberLauncherForActivityResult
+
+        scope.launch {
+            runCatching { context.writeTextToUri(uri, json) }
+                .onSuccess { onExportCompleted() }
+                .onFailure { throwable ->
+                    onFileActionMessage("导出失败：${throwable.message ?: "无法写入文件"}")
+                }
+        }
+    }
+
+    val importLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument(),
+    ) { uri: Uri? ->
+        if (uri == null) return@rememberLauncherForActivityResult
+
+        scope.launch {
+            runCatching { context.readTextFromUri(uri) }
+                .onSuccess(onImportJson)
+                .onFailure { throwable ->
+                    onFileActionMessage("导入失败：${throwable.message ?: "无法读取文件"}")
+                }
+        }
+    }
+
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -66,6 +118,45 @@ fun PhraseLibraryScreen(
                 Icon(Icons.Outlined.Add, contentDescription = null)
                 Text("新增")
             }
+        }
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            OutlinedButton(
+                onClick = { importLauncher.launch(arrayOf("application/json", "text/*", "*/*")) },
+                modifier = Modifier.weight(1f),
+            ) {
+                Icon(Icons.Outlined.FileUpload, contentDescription = null)
+                Text("导入")
+            }
+            OutlinedButton(
+                onClick = {
+                    scope.launch {
+                        runCatching { onBuildExportJson() }
+                            .onSuccess { json ->
+                                pendingExportJson = json
+                                exportLauncher.launch("phrasevoice-phrases.json")
+                            }
+                            .onFailure { throwable ->
+                                onFileActionMessage("导出失败：${throwable.message ?: "无法生成文件"}")
+                            }
+                    }
+                },
+                modifier = Modifier.weight(1f),
+            ) {
+                Icon(Icons.Outlined.FileDownload, contentDescription = null)
+                Text("导出")
+            }
+        }
+
+        state.fileActionMessage?.let { message ->
+            Text(
+                text = message,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.primary,
+            )
         }
 
         OutlinedTextField(
@@ -219,4 +310,15 @@ private fun PhraseEditorDialog(
             }
         },
     )
+}
+
+private fun Context.readTextFromUri(uri: Uri): String =
+    contentResolver.openInputStream(uri)?.use { input ->
+        input.bufferedReader(Charsets.UTF_8).readText()
+    } ?: error("无法打开文件")
+
+private fun Context.writeTextToUri(uri: Uri, text: String) {
+    contentResolver.openOutputStream(uri, "wt")?.use { output ->
+        output.write(text.toByteArray(Charsets.UTF_8))
+    } ?: error("无法打开文件")
 }
