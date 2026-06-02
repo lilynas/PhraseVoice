@@ -62,22 +62,19 @@ class PhraseLibraryBackupCodecTest {
                 testPhrase(id = "p2", title = "到站", text = "我到了", groupId = "travel"),
             ),
         )
-        val ids = listOf("new-phrase")
-        var nextId = 0
-
         val merged = PhraseLibraryImporter.merge(
             currentGroups = currentGroups,
             currentPhrases = currentPhrases,
             backup = backup,
             now = 99L,
-            idFactory = { ids[nextId++] },
+            idFactory = { "new-phrase" },
         )
 
         assertEquals(1, merged.importResult.importedGroups)
         assertEquals(1, merged.importResult.importedPhrases)
         assertEquals(1, merged.importResult.skippedPhrases)
         assertEquals("出行", merged.groups.last().name)
-        assertEquals("new-phrase", merged.phrases.last().id)
+        assertEquals("p2", merged.phrases.last().id)
         assertEquals(merged.groups.last().id, merged.phrases.last().groupId)
     }
 
