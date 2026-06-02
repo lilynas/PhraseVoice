@@ -9,6 +9,7 @@ import com.phrasevoice.data.local.safeData
 import com.phrasevoice.data.model.CustomHttpSettings
 import com.phrasevoice.data.model.ProviderConfig
 import com.phrasevoice.data.security.ApiKeyCipher
+import com.phrasevoice.debug.AppLogger
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
@@ -38,6 +39,10 @@ class ProviderConfigRepository(
 
     suspend fun getRuntimeConfig(providerId: String): RuntimeProviderConfig {
         val config = getConfig(providerId)
+        AppLogger.i(
+            TAG,
+            "runtimeConfig provider=$providerId enabled=${config.enabled} baseUrlSet=${!config.baseUrl.isNullOrBlank()} model=${config.model.orEmpty()} voice=${config.defaultVoice.orEmpty()} apiKeySaved=${!config.encryptedValue.isNullOrBlank()}",
+        )
         return RuntimeProviderConfig(
             config = config,
             apiKey = apiKeyCipher.decrypt(config.encryptedValue),
@@ -97,6 +102,8 @@ class ProviderConfigRepository(
     }
 
     companion object {
+        private const val TAG = "ProviderConfigRepo"
+
         const val ANDROID_SYSTEM = "android_system"
         const val OPENAI = "openai"
         const val GEMINI = "gemini"

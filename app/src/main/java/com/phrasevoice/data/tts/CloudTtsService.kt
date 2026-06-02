@@ -6,6 +6,7 @@ import com.phrasevoice.data.model.CustomHttpResponseType
 import com.phrasevoice.data.model.CustomHttpSettings
 import com.phrasevoice.data.repository.ProviderConfigRepository
 import com.phrasevoice.data.repository.RuntimeProviderConfig
+import com.phrasevoice.debug.AppLogger
 import com.phrasevoice.domain.model.AudioFormat
 import com.phrasevoice.domain.tts.TtsRequest
 import com.phrasevoice.domain.tts.TtsResult
@@ -34,6 +35,10 @@ class CloudTtsService(
         request: TtsRequest,
         runtimeConfig: RuntimeProviderConfig,
     ): TtsResult = withContext(Dispatchers.IO) {
+        AppLogger.i(
+            TAG,
+            "cloud synthesize provider=${runtimeConfig.config.providerId} model=${runtimeConfig.config.model.orEmpty()} voice=${request.voiceId.orEmpty()} length=${request.text.length}",
+        )
         when (runtimeConfig.config.providerId) {
             ProviderConfigRepository.OPENAI -> synthesizeOpenAiCompatible(request, runtimeConfig)
             ProviderConfigRepository.CUSTOM_HTTP -> synthesizeCustomHttp(request, runtimeConfig)
@@ -49,6 +54,7 @@ class CloudTtsService(
         if (apiKey.isNullOrBlank()) return TtsResult.Error("请先在 Provider 页面保存 API Key。")
         val baseUrl = runtimeConfig.config.baseUrl?.takeIf { it.isNotBlank() }
             ?: return TtsResult.Error("请先配置 OpenAI-compatible Base URL。")
+        AppLogger.i(TAG, "openai request url=${baseUrl.safeUrlForLog()}")
         val format = AudioFormat.MP3
         val target = audioFileStore.createTarget(format)
         val body = JsonObject(
@@ -80,6 +86,7 @@ class CloudTtsService(
         val config = runtimeConfig.config
         val baseUrl = config.baseUrl?.takeIf { it.isNotBlank() }
             ?: return TtsResult.Error("请先配置 Custom HTTP Base URL。")
+        AppLogger.i(TAG, "custom request url=${baseUrl.safeUrlForLog()}")
         val settings = com.phrasevoice.data.local.PhraseVoiceJson.decode(
             config.extraJson,
             CustomHttpSettings(),
@@ -150,12 +157,18 @@ class CloudTtsService(
     ): TtsResult =
         runCatching {
             httpClient.newCall(request).execute().use { response ->
+                AppLogger.i(
+                    TAG,
+                    "audio response code=${response.code} contentType=${response.body?.contentType()} url=${request.url.toString().safeUrlForLog()}",
+                )
                 if (!response.isSuccessful) return response.toTtsError()
                 val body = response.body ?: return TtsResult.Error("服务没有返回音频内容。")
                 file.outputStream().use { output -> body.byteStream().copyTo(output) }
+                AppLogger.i(TAG, "audio saved bytes=${file.length()} uri=$uri")
                 TtsResult.AudioFile(uri = uri, mimeType = response.body?.contentType()?.toString() ?: mimeType)
             }
         }.getOrElse { throwable ->
+            AppLogger.e(TAG, "audio request failed url=${request.url.toString().safeUrlForLog()}", throwable)
             TtsResult.Error("网络请求失败：${throwable.message ?: "未知错误"}", throwable)
         }
 
@@ -168,11 +181,13 @@ class CloudTtsService(
     ): TtsResult =
         runCatching {
             httpClient.newCall(request).execute().use { response ->
+                AppLogger.i(TAG, "json base64 response code=${response.code} url=${request.url.toString().safeUrlForLog()}")
                 if (!response.isSuccessful) return response.toTtsError()
                 val json = response.body?.string() ?: return TtsResult.Error("服务没有返回 JSON。")
                 val base64Audio = findJsonString(json, fieldPath)
                     ?: return TtsResult.Error("JSON 中没有找到字段：$fieldPath")
                 file.writeBytes(Base64.getDecoder().decode(base64Audio))
+                AppLogger.i(TAG, "json base64 audio saved bytes=${file.length()} uri=$uri")
                 TtsResult.AudioFile(uri = uri, mimeType = mimeType)
             }
         }.getOrElse { throwable ->
@@ -188,6 +203,7 @@ class CloudTtsService(
     ): TtsResult =
         runCatching {
             httpClient.newCall(request).execute().use { response ->
+                AppLogger.i(TAG, "json url response code=${response.code} url=${request.url.toString().safeUrlForLog()}")
                 if (!response.isSuccessful) return response.toTtsError()
                 val json = response.body?.string() ?: return TtsResult.Error("服务没有返回 JSON。")
                 val audioUrl = findJsonString(json, fieldPath)
@@ -216,10 +232,23 @@ class CloudTtsService(
             in 500..599 -> "服务端暂时不可用：HTTP $code。"
             else -> "请求失败：HTTP $code。"
         }
+        AppLogger.w(TAG, "request error code=$code url=${request.url.toString().safeUrlForLog()}")
         return TtsResult.Error(message)
     }
 
     companion object {
+        private const val TAG = "CloudTtsService"
         private val JSON_MEDIA_TYPE = "application/json; charset=utf-8".toMediaType()
     }
 }
+
+private fun String.safeUrlForLog(): String =
+    runCatching {
+        val uri = java.net.URI(this)
+        buildString {
+            append(uri.scheme ?: "https")
+            append("://")
+            append(uri.host ?: "unknown-host")
+            uri.path?.takeIf { it.isNotBlank() }?.let(::append)
+        }
+    }.getOrDefault("<invalid-url>")

@@ -140,6 +140,7 @@ fun PhraseVoiceRoot(container: AppContainer) {
                 onVolumeChange = settingsViewModel::updateDefaultVolume,
                 onAutoSaveHistoryChange = settingsViewModel::updateAutoSaveHistory,
                 onKeepAudioCacheChange = settingsViewModel::updateKeepAudioCache,
+                onClearDebugLogs = settingsViewModel::clearDebugLogs,
                 modifier = modifier,
             )
         }

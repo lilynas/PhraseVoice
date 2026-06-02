@@ -10,6 +10,7 @@ import com.phrasevoice.domain.tts.TtsProvider
 import com.phrasevoice.domain.tts.TtsRequest
 import com.phrasevoice.domain.tts.TtsResult
 import com.phrasevoice.domain.tts.TtsVoice
+import com.phrasevoice.debug.AppLogger
 import java.io.File
 import java.util.Locale
 import java.util.UUID
@@ -111,17 +112,26 @@ class AndroidSystemTtsProvider(
         }
 
         when (val status = withTimeoutOrNull(INIT_TIMEOUT_MS) { initStatus.await() }) {
-            TextToSpeech.SUCCESS -> AndroidTtsReadiness(ready = true, engines = engines)
-            null -> AndroidTtsReadiness(
-                ready = false,
-                message = "Android 系统 TTS 初始化超时。请检查系统语音服务是否可用，或切换到 OpenAI/Custom HTTP。",
-                engines = engines,
-            )
-            else -> AndroidTtsReadiness(
-                ready = false,
-                message = "Android 系统 TTS 初始化失败（状态 $status）。请检查系统语音服务是否可用，或切换到 OpenAI/Custom HTTP。",
-                engines = engines,
-            )
+            TextToSpeech.SUCCESS -> {
+                AppLogger.i(TAG, "readiness ready engines=${engines.map { it.name }}")
+                AndroidTtsReadiness(ready = true, engines = engines)
+            }
+            null -> {
+                AppLogger.w(TAG, "readiness timeout engines=${engines.map { it.name }}")
+                AndroidTtsReadiness(
+                    ready = false,
+                    message = "Android 系统 TTS 初始化超时。请检查系统语音服务是否可用，或切换到 OpenAI/Custom HTTP。",
+                    engines = engines,
+                )
+            }
+            else -> {
+                AppLogger.w(TAG, "readiness failed status=$status engines=${engines.map { it.name }}")
+                AndroidTtsReadiness(
+                    ready = false,
+                    message = "Android 系统 TTS 初始化失败（状态 $status）。请检查系统语音服务是否可用，或切换到 OpenAI/Custom HTTP。",
+                    engines = engines,
+                )
+            }
         }
     }
 
@@ -133,6 +143,7 @@ class AndroidSystemTtsProvider(
 
         applyRequestOptions(request)
         val utteranceId = UUID.randomUUID().toString()
+        AppLogger.i(TAG, "speak request voice=${request.voiceId.orEmpty()} language=${request.language.orEmpty()} length=${request.text.length}")
         val result = textToSpeech.speak(
             request.text,
             TextToSpeech.QUEUE_FLUSH,
@@ -141,8 +152,10 @@ class AndroidSystemTtsProvider(
         )
 
         if (result == TextToSpeech.SUCCESS) {
+            AppLogger.i(TAG, "speak started utteranceId=$utteranceId")
             TtsResult.LocalPlaybackStarted(utteranceId)
         } else {
+            AppLogger.w(TAG, "speak start failed result=$result")
             TtsResult.Error("Android TextToSpeech could not start playback.")
         }
     }
@@ -176,6 +189,7 @@ class AndroidSystemTtsProvider(
 
         if (result != TextToSpeech.SUCCESS) {
             fileRequests.remove(utteranceId)
+            AppLogger.w(TAG, "synthesizeToFile start failed result=$result")
             return@withContext TtsResult.Error("Android TextToSpeech could not create the audio file.")
         }
 
@@ -234,6 +248,7 @@ class AndroidSystemTtsProvider(
     )
 
     companion object {
+        private const val TAG = "AndroidSystemTts"
         private const val INIT_TIMEOUT_MS = 10_000L
         private const val FILE_SYNTHESIS_TIMEOUT_MS = 60_000L
     }

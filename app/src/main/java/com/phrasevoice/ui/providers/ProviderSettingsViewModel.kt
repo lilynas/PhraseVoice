@@ -7,6 +7,7 @@ import com.phrasevoice.data.model.CustomHttpResponseType
 import com.phrasevoice.data.model.CustomHttpSettings
 import com.phrasevoice.data.model.ProviderConfig
 import com.phrasevoice.data.repository.ProviderConfigRepository
+import com.phrasevoice.debug.AppLogger
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
@@ -57,6 +58,7 @@ class ProviderSettingsViewModel(
 
     fun selectProvider(providerId: String) {
         val selected = uiState.value.configs.firstOrNull { it.providerId == providerId } ?: return
+        AppLogger.i(TAG, "settings selectProvider id=$providerId enabled=${selected.enabled}")
         _uiState.update {
             it.copy(selectedProviderId = providerId, savedMessage = null)
                 .withSelectedConfig(selected)
@@ -79,6 +81,10 @@ class ProviderSettingsViewModel(
 
     fun save() {
         val state = uiState.value
+        AppLogger.i(
+            TAG,
+            "save provider=${state.selectedProviderId} enabled=${state.enabledDraft} baseUrlSet=${state.baseUrlDraft.isNotBlank()} model=${state.modelDraft} voice=${state.voiceDraft} apiKeyChanged=${state.apiKeyDraft.isNotBlank()}",
+        )
         val extraJson = if (state.isCustomHttp) {
             PhraseVoiceJson.encode(
                 CustomHttpSettings(
@@ -110,6 +116,7 @@ class ProviderSettingsViewModel(
                     savedMessage = "已保存",
                 )
             }
+            AppLogger.i(TAG, "save complete provider=${state.selectedProviderId}")
         }
     }
 
@@ -129,5 +136,9 @@ class ProviderSettingsViewModel(
             responseTypeDraft = customSettings.responseType,
             responseFieldDraft = customSettings.responseField,
         )
+    }
+
+    companion object {
+        private const val TAG = "ProviderSettings"
     }
 }

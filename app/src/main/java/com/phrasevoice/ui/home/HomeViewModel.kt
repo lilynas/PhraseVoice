@@ -12,6 +12,7 @@ import com.phrasevoice.data.repository.SettingsRepository
 import com.phrasevoice.data.tts.AudioPlaybackController
 import com.phrasevoice.data.tts.AndroidSystemTtsProvider
 import com.phrasevoice.data.tts.CloudTtsService
+import com.phrasevoice.debug.AppLogger
 import com.phrasevoice.domain.model.AudioFormat
 import com.phrasevoice.domain.tts.TtsRequest
 import com.phrasevoice.domain.tts.TtsResult
@@ -159,6 +160,7 @@ class HomeViewModel(
     fun selectProvider(providerId: String) {
         val option = uiState.value.providers.firstOrNull { it.id == providerId } ?: return
         val voices = voicesFor(providerId)
+        AppLogger.i(TAG, "selectProvider id=$providerId enabled=${option.enabled}")
         _uiState.update {
             val androidUnavailable = providerId == ProviderConfigRepository.ANDROID_SYSTEM && !it.androidTtsReady
             it.copy(
@@ -219,6 +221,10 @@ class HomeViewModel(
         viewModelScope.launch {
             _uiState.update { it.copy(status = HomeStatus.Loading, errorMessage = null) }
             val request = currentRequest(text = trimmed, outputFormat = AudioFormat.MP3)
+            AppLogger.i(
+                TAG,
+                "speak start provider=${request.providerId} voice=${request.voiceId.orEmpty()} length=${trimmed.length}",
+            )
             when (val result = synthesizeForCurrentProvider(request, playAudioFile = true)) {
                 is TtsResult.LocalPlaybackStarted -> {
                     if (settingsRepository.settings.first().autoSaveHistory) {
@@ -228,6 +234,7 @@ class HomeViewModel(
                             voiceId = request.voiceId,
                         )
                     }
+                    AppLogger.i(TAG, "speak local playback started provider=${request.providerId}")
                     _uiState.update { it.copy(status = HomeStatus.Playing, errorMessage = null) }
                 }
 
@@ -240,6 +247,7 @@ class HomeViewModel(
                             audioUri = result.uri.toString(),
                         )
                     }
+                    AppLogger.i(TAG, "speak audio file ready provider=${request.providerId} uri=${result.uri}")
                     _uiState.update {
                         it.copy(
                             status = HomeStatus.Playing,
@@ -250,6 +258,7 @@ class HomeViewModel(
                 }
 
                 is TtsResult.Error -> {
+                    AppLogger.e(TAG, "speak failed provider=${request.providerId}: ${result.message}", result.cause)
                     _uiState.update {
                         it.copy(status = HomeStatus.Error, errorMessage = result.message)
                     }
@@ -275,6 +284,10 @@ class HomeViewModel(
                 AudioFormat.MP3
             }
             val request = currentRequest(text = trimmed, outputFormat = outputFormat)
+            AppLogger.i(
+                TAG,
+                "saveAudio start provider=${request.providerId} voice=${request.voiceId.orEmpty()} format=$outputFormat length=${trimmed.length}",
+            )
             when (val result = synthesizeForCurrentProvider(request, playAudioFile = false)) {
                 is TtsResult.AudioFile -> {
                     historyRepository.addHistory(
@@ -283,6 +296,7 @@ class HomeViewModel(
                         voiceId = request.voiceId,
                         audioUri = result.uri.toString(),
                     )
+                    AppLogger.i(TAG, "saveAudio success provider=${request.providerId} uri=${result.uri}")
                     _uiState.update {
                         it.copy(
                             status = HomeStatus.Idle,
@@ -293,6 +307,7 @@ class HomeViewModel(
                 }
 
                 is TtsResult.Error -> {
+                    AppLogger.e(TAG, "saveAudio failed provider=${request.providerId}: ${result.message}", result.cause)
                     _uiState.update {
                         it.copy(status = HomeStatus.Error, errorMessage = result.message)
                     }
@@ -436,5 +451,9 @@ class HomeViewModel(
                     providerId = providerId,
                 )
             }
+    }
+
+    companion object {
+        private const val TAG = "HomeViewModel"
     }
 }
