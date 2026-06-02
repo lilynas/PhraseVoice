@@ -54,6 +54,7 @@ fun HomeScreen(
     onTextChange: (String) -> Unit,
     onProviderSelected: (String) -> Unit,
     onVoiceSelected: (String?) -> Unit,
+    onVoiceStyleSelected: (String?) -> Unit,
     onSpeedChange: (Float) -> Unit,
     onPitchChange: (Float) -> Unit,
     onVolumeChange: (Float) -> Unit,
@@ -90,6 +91,13 @@ fun HomeScreen(
             state = state,
             onVoiceSelected = onVoiceSelected,
         )
+
+        if (state.voiceStyles.isNotEmpty()) {
+            VoiceStyleDropdown(
+                state = state,
+                onVoiceStyleSelected = onVoiceStyleSelected,
+            )
+        }
 
         OutlinedTextField(
             value = state.text,
@@ -204,6 +212,47 @@ private fun ProviderDropdown(
                     onClick = {
                         expanded = false
                         onProviderSelected(provider.id)
+                    },
+                )
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun VoiceStyleDropdown(
+    state: HomeUiState,
+    onVoiceStyleSelected: (String?) -> Unit,
+) {
+    var expanded by remember { mutableStateOf(false) }
+    val selected = state.voiceStyles.firstOrNull { it.id == state.selectedVoiceStyleId }
+        ?: state.voiceStyles.firstOrNull()
+
+    ExposedDropdownMenuBox(
+        expanded = expanded,
+        onExpandedChange = { expanded = !expanded },
+    ) {
+        OutlinedTextField(
+            modifier = Modifier
+                .menuAnchor()
+                .fillMaxWidth(),
+            readOnly = true,
+            value = selected?.name.orEmpty(),
+            onValueChange = {},
+            label = { Text("风格") },
+            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+        )
+        ExposedDropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false },
+        ) {
+            state.voiceStyles.forEach { style ->
+                DropdownMenuItem(
+                    text = { Text(style.name) },
+                    onClick = {
+                        expanded = false
+                        onVoiceStyleSelected(style.id)
                     },
                 )
             }

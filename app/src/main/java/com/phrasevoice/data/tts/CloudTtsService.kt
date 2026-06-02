@@ -98,11 +98,16 @@ class CloudTtsService(
         val format = AudioFormat.MP3
         val target = audioFileStore.createTarget(format, cache = cache)
         val url = endpoint.newBuilder()
-            .addQueryParameter("voice", request.voiceId ?: config.defaultVoice ?: DEFAULT_EDGE_FORWARDER_VOICE)
+            .addQueryParameter("voice", request.voiceId ?: config.defaultVoice ?: EdgeForwarderCatalog.DEFAULT_VOICE_ID)
             .addQueryParameter("volume", edgeVolume(request.volume).toString())
             .addQueryParameter("rate", edgeProsodyPercent(request.speed).toString())
             .addQueryParameter("pitch", edgeProsodyPercent(request.pitch).toString())
             .addQueryParameter("text", request.text)
+            .apply {
+                request.stylePrompt
+                    ?.takeIf { it.isNotBlank() }
+                    ?.let { style -> addQueryParameter("personality", style) }
+            }
             .build()
         AppLogger.i(TAG, "edge forwarder request url=${url.toString().safeUrlForLog()}")
 
@@ -294,8 +299,6 @@ class CloudTtsService(
 
     companion object {
         private const val TAG = "CloudTtsService"
-        private const val DEFAULT_EDGE_FORWARDER_VOICE =
-            "Microsoft Server Speech Text to Speech Voice (zh-CN, XiaoxiaoNeural)"
         private val JSON_MEDIA_TYPE = "application/json; charset=utf-8".toMediaType()
     }
 }

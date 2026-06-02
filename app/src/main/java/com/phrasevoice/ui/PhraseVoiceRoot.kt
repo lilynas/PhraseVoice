@@ -77,6 +77,7 @@ fun PhraseVoiceRoot(container: AppContainer) {
                 onTextChange = homeViewModel::updateText,
                 onProviderSelected = homeViewModel::selectProvider,
                 onVoiceSelected = homeViewModel::selectVoice,
+                onVoiceStyleSelected = homeViewModel::selectVoiceStyle,
                 onSpeedChange = homeViewModel::updateSpeed,
                 onPitchChange = homeViewModel::updatePitch,
                 onVolumeChange = homeViewModel::updateVolume,

@@ -12,6 +12,8 @@ import com.phrasevoice.data.repository.SettingsRepository
 import com.phrasevoice.data.tts.AudioPlaybackController
 import com.phrasevoice.data.tts.AndroidSystemTtsProvider
 import com.phrasevoice.data.tts.CloudTtsService
+import com.phrasevoice.data.tts.EdgeForwarderCatalog
+import com.phrasevoice.data.tts.EdgeForwarderStyle
 import com.phrasevoice.debug.AppLogger
 import com.phrasevoice.domain.model.AudioFormat
 import com.phrasevoice.domain.tts.TtsRequest
@@ -46,6 +48,8 @@ data class HomeUiState(
     val selectedProviderId: String = ProviderConfigRepository.ANDROID_SYSTEM,
     val voices: List<TtsVoice> = emptyList(),
     val selectedVoiceId: String? = null,
+    val voiceStyles: List<EdgeForwarderStyle> = emptyList(),
+    val selectedVoiceStyleId: String? = null,
     val speed: Float = 1.0f,
     val pitch: Float = 1.0f,
     val volume: Float = 1.0f,
@@ -103,6 +107,7 @@ class HomeViewModel(
                         .takeIf { id -> configs.any { it.providerId == id } }
                         ?: ProviderConfigRepository.ANDROID_SYSTEM
                     val voices = voicesFor(selectedProviderId)
+                    val styles = stylesFor(selectedProviderId)
                     state.copy(
                         providers = providers,
                         selectedProviderId = selectedProviderId,
@@ -110,6 +115,10 @@ class HomeViewModel(
                         selectedVoiceId = state.selectedVoiceId
                             ?.takeIf { voiceId -> voices.any { it.id == voiceId } }
                             ?: voices.firstOrNull()?.id,
+                        voiceStyles = styles,
+                        selectedVoiceStyleId = state.selectedVoiceStyleId
+                            ?.takeIf { styleId -> styles.any { it.id == styleId } }
+                            ?: styles.firstOrNull()?.id,
                     )
                 }
             }
@@ -121,6 +130,8 @@ class HomeViewModel(
                 it.copy(
                     voices = voicesFor(it.selectedProviderId),
                     selectedVoiceId = voicesFor(it.selectedProviderId).firstOrNull()?.id,
+                    voiceStyles = stylesFor(it.selectedProviderId),
+                    selectedVoiceStyleId = stylesFor(it.selectedProviderId).firstOrNull()?.id,
                 )
             }
         }
@@ -171,6 +182,7 @@ class HomeViewModel(
     fun selectProvider(providerId: String) {
         val option = uiState.value.providers.firstOrNull { it.id == providerId } ?: return
         val voices = voicesFor(providerId)
+        val styles = stylesFor(providerId)
         AppLogger.i(TAG, "selectProvider id=$providerId enabled=${option.enabled}")
         _uiState.update {
             val androidUnavailable = providerId == ProviderConfigRepository.ANDROID_SYSTEM && !it.androidTtsReady
@@ -178,6 +190,8 @@ class HomeViewModel(
                 selectedProviderId = providerId,
                 voices = voices,
                 selectedVoiceId = voices.firstOrNull()?.id,
+                voiceStyles = styles,
+                selectedVoiceStyleId = styles.firstOrNull()?.id,
                 lastAudioUri = null,
                 lastAudioMimeType = null,
                 status = when {
@@ -191,6 +205,16 @@ class HomeViewModel(
                     providerId == ProviderConfigRepository.MIMO -> "MiMo TTS 已加入计划，后续会接入预置音色和 VoiceDesign 角色声音。"
                     else -> "${option.name} 尚未启用，请先在 Provider 页面保存配置。"
                 },
+            )
+        }
+    }
+
+    fun selectVoiceStyle(styleId: String?) {
+        _uiState.update {
+            it.copy(
+                selectedVoiceStyleId = styleId,
+                lastAudioUri = null,
+                lastAudioMimeType = null,
             )
         }
     }
@@ -413,6 +437,9 @@ class HomeViewModel(
             speed = state.speed,
             pitch = state.pitch,
             volume = state.volume,
+            stylePrompt = state.selectedVoiceStyleId
+                ?.takeIf { state.selectedProviderId == ProviderConfigRepository.EDGE_TTS_FORWARDER }
+                ?.takeIf { it.isNotBlank() },
             outputFormat = outputFormat,
         )
     }
@@ -483,27 +510,17 @@ class HomeViewModel(
             else -> emptyList()
         }
 
+    private fun stylesFor(providerId: String): List<EdgeForwarderStyle> =
+        if (providerId == ProviderConfigRepository.EDGE_TTS_FORWARDER) {
+            EdgeForwarderCatalog.styles
+        } else {
+            emptyList()
+        }
+
     private fun edgeForwarderVoices(): List<TtsVoice> {
         val providerId = ProviderConfigRepository.EDGE_TTS_FORWARDER
         val configured = providerConfigs.firstOrNull { it.providerId == providerId }?.defaultVoice
-        val defaults = listOf(
-            "Microsoft Server Speech Text to Speech Voice (zh-CN, XiaoxiaoNeural)" to "晓晓 zh-CN",
-            "Microsoft Server Speech Text to Speech Voice (zh-CN, XiaoyiNeural)" to "晓伊 zh-CN",
-            "Microsoft Server Speech Text to Speech Voice (zh-CN, YunjianNeural)" to "云健 zh-CN",
-            "Microsoft Server Speech Text to Speech Voice (zh-CN, YunxiNeural)" to "云希 zh-CN",
-            "Microsoft Server Speech Text to Speech Voice (zh-CN, YunxiaNeural)" to "云夏 zh-CN",
-            "Microsoft Server Speech Text to Speech Voice (zh-CN, YunyangNeural)" to "云扬 zh-CN",
-            "Microsoft Server Speech Text to Speech Voice (zh-CN-liaoning, XiaobeiNeural)" to "晓北 辽宁",
-            "Microsoft Server Speech Text to Speech Voice (zh-CN-shaanxi, XiaoniNeural)" to "晓妮 陕西",
-            "Microsoft Server Speech Text to Speech Voice (zh-HK, HiuGaaiNeural)" to "晓佳 zh-HK",
-            "Microsoft Server Speech Text to Speech Voice (zh-HK, HiuMaanNeural)" to "晓曼 zh-HK",
-            "Microsoft Server Speech Text to Speech Voice (zh-HK, WanLungNeural)" to "云龙 zh-HK",
-            "Microsoft Server Speech Text to Speech Voice (zh-TW, HsiaoChenNeural)" to "晓臻 zh-TW",
-            "Microsoft Server Speech Text to Speech Voice (zh-TW, HsiaoYuNeural)" to "晓雨 zh-TW",
-            "Microsoft Server Speech Text to Speech Voice (zh-TW, YunJheNeural)" to "云哲 zh-TW",
-            "Microsoft Server Speech Text to Speech Voice (en-US, JennyNeural)" to "Jenny en-US",
-            "Microsoft Server Speech Text to Speech Voice (en-US, GuyNeural)" to "Guy en-US",
-        )
+        val defaults = EdgeForwarderCatalog.voices.map { it.id to "${it.name} ${it.locale}" }
         val configuredVoice = configured
             ?.takeIf { it.isNotBlank() }
             ?.takeUnless { voice -> defaults.any { it.first == voice } }

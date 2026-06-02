@@ -9,6 +9,7 @@ import com.phrasevoice.data.local.safeData
 import com.phrasevoice.data.model.CustomHttpSettings
 import com.phrasevoice.data.model.ProviderConfig
 import com.phrasevoice.data.security.ApiKeyCipher
+import com.phrasevoice.data.tts.EdgeForwarderCatalog
 import com.phrasevoice.debug.AppLogger
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
@@ -128,7 +129,7 @@ class ProviderConfigRepository(
                     providerId = EDGE_TTS_FORWARDER,
                     enabled = false,
                     baseUrl = "https://tts.shirone.de/api/text-to-speech",
-                    defaultVoice = "Microsoft Server Speech Text to Speech Voice (zh-CN, XiaoxiaoNeural)",
+                    defaultVoice = EdgeForwarderCatalog.DEFAULT_VOICE_ID,
                 ),
                 ProviderConfig(
                     providerId = GEMINI,

@@ -41,6 +41,7 @@ import androidx.compose.ui.unit.dp
 import com.phrasevoice.data.model.CustomHttpResponseType
 import com.phrasevoice.data.model.ProviderConfig
 import com.phrasevoice.data.repository.ProviderConfigRepository
+import com.phrasevoice.data.tts.EdgeForwarderCatalog
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -161,13 +162,20 @@ fun ProviderSettingsScreen(
                             )
                         }
 
-                        OutlinedTextField(
-                            value = state.voiceDraft,
-                            onValueChange = onVoiceChange,
-                            label = { Text(if (state.isEdgeForwarder) "默认 Voice（完整 Microsoft voice name）" else "默认 Voice") },
-                            singleLine = true,
-                            modifier = Modifier.fillMaxWidth(),
-                        )
+                        if (state.isEdgeForwarder) {
+                            EdgeForwarderVoiceDropdown(
+                                voiceDraft = state.voiceDraft,
+                                onVoiceChange = onVoiceChange,
+                            )
+                        } else {
+                            OutlinedTextField(
+                                value = state.voiceDraft,
+                                onValueChange = onVoiceChange,
+                                label = { Text("默认 Voice") },
+                                singleLine = true,
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                        }
 
                         if (state.isCustomHttp) {
                             CustomHttpFields(
@@ -242,6 +250,55 @@ private fun ProviderIcon(providerId: String) {
         else -> Icons.Outlined.Cloud
     }
     Icon(icon, contentDescription = null)
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun EdgeForwarderVoiceDropdown(
+    voiceDraft: String,
+    onVoiceChange: (String) -> Unit,
+) {
+    var expanded by remember { mutableStateOf(false) }
+    val knownVoices = EdgeForwarderCatalog.voices
+    val selectedName = knownVoices
+        .firstOrNull { it.id == voiceDraft }
+        ?.let { "${it.name} ${it.locale}" }
+        ?: voiceDraft
+
+    ExposedDropdownMenuBox(
+        expanded = expanded,
+        onExpandedChange = { expanded = !expanded },
+    ) {
+        OutlinedTextField(
+            modifier = Modifier
+                .menuAnchor()
+                .fillMaxWidth(),
+            readOnly = true,
+            value = selectedName,
+            onValueChange = {},
+            label = { Text("默认发音人") },
+            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+        )
+        ExposedDropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false },
+        ) {
+            knownVoices.forEach { voice ->
+                DropdownMenuItem(
+                    text = {
+                        Column {
+                            Text(voice.name, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Text(voice.locale, style = MaterialTheme.typography.bodySmall)
+                        }
+                    },
+                    onClick = {
+                        expanded = false
+                        onVoiceChange(voice.id)
+                    },
+                )
+            }
+        }
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)

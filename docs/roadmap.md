@@ -24,7 +24,7 @@
 
 - Use the `ms-ra-forwarder` `/api/text-to-speech` endpoint as a first-class provider.
 - Default endpoint: `https://tts.shirone.de/api/text-to-speech`.
-- Request shape: send `voice`, `volume`, `rate`, `pitch`, and `text` as GET query parameters.
+- Request shape: send `voice`, `volume`, `rate`, `pitch`, `personality`, and `text` as GET query parameters.
 - Authentication: when the deployment has `TOKEN` configured, send `Authorization: Bearer <token>` using the saved Token field.
 - Initial voice list: include common Chinese and English Microsoft voice names; users can still paste a full Microsoft voice name as the default voice.
 - Keep this provider separate from Custom HTTP so common Edge TTS usage requires less manual template editing.

@@ -12,7 +12,7 @@ Phase 1 MVP is in progress:
 - History records with replay and save-as-phrase
 - Audio export through Android system TTS as WAV
 - Provider abstraction ready for cloud providers
-- Edge TTS Forwarder provider for user-managed `ms-ra-forwarder` instances
+- Edge TTS Forwarder provider for user-managed `ms-ra-forwarder` instances, with voice and style dropdowns
 - GitHub Actions CI for build and unit test verification
 
 Phase 2 will continue with Gemini TTS, Xiaomi MiMo V2.5 TTS with VoiceDesign character voices, and broader Custom HTTP presets.
