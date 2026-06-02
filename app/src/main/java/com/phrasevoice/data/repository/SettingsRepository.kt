@@ -8,6 +8,7 @@ import com.phrasevoice.data.local.PhraseVoicePreferenceKeys
 import com.phrasevoice.data.local.safeData
 import com.phrasevoice.data.model.UserSettings
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 
@@ -21,6 +22,7 @@ class SettingsRepository(
                 UserSettings(),
             )
         }
+        .distinctUntilChanged()
 
     suspend fun updateSettings(transform: (UserSettings) -> UserSettings) {
         dataStore.edit { preferences ->
