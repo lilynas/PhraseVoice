@@ -100,7 +100,7 @@ class CloudTtsService(
         AppLogger.i(TAG, "mimo prompt optimize url=${endpoint.toString().safeUrlForLog()} model=$model")
         val httpRequest = Request.Builder()
             .url(endpoint)
-            .addHeader("api-key", apiKey)
+            .addMimoAuthHeader(apiKey)
             .addHeader("Content-Type", "application/json")
             .post(body.toRequestBody(JSON_MEDIA_TYPE))
             .build()
@@ -327,7 +327,7 @@ class CloudTtsService(
         )
         val httpRequest = Request.Builder()
             .url(endpoint)
-            .addHeader("api-key", apiKey)
+            .addMimoAuthHeader(apiKey)
             .addHeader("Content-Type", "application/json")
             .post(body.toRequestBody(JSON_MEDIA_TYPE))
             .build()
@@ -592,6 +592,9 @@ class CloudTtsService(
         }
         return parsed.newBuilder().encodedPath(apiPath).build()
     }
+
+    private fun Request.Builder.addMimoAuthHeader(apiKey: String): Request.Builder =
+        addHeader("Authorization", "Bearer $apiKey")
 
     private fun edgeProsodyPercent(value: Float): Int =
         ((value.coerceIn(0.5f, 2.0f) - 1.0f) * 100).roundToInt().coerceIn(-100, 100)
