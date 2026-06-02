@@ -14,7 +14,7 @@ Phase 1 MVP is in progress:
 - Provider abstraction ready for cloud providers
 - GitHub Actions CI for build and unit test verification
 
-Phase 2 will add OpenAI TTS, Gemini TTS, and configurable Custom HTTP providers.
+Phase 2 will add OpenAI TTS, Gemini TTS, Xiaomi MiMo V2.5 TTS, and configurable Custom HTTP providers.
 
 ## Build Verification
 
@@ -31,6 +31,7 @@ The workflow installs JDK 17, Android SDK 35, and Gradle 8.7.
 - Do not commit API keys, tokens, `.env` files, keystores, or provider secrets.
 - Network request logging must stay disabled or redacted before cloud providers are enabled.
 - Users are responsible for third-party API costs.
+- MiMo TTS will follow Xiaomi MiMo's official V2.5 speech synthesis API and store API keys only through the app's provider configuration.
 - Edge TTS network integrations should be configured through Custom HTTP providers unless an official Android TTS service is installed. Non-official services may have stability and compliance risks.
 
 ## License

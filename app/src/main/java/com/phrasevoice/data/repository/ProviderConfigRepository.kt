@@ -107,6 +107,7 @@ class ProviderConfigRepository(
         const val ANDROID_SYSTEM = "android_system"
         const val OPENAI = "openai"
         const val GEMINI = "gemini"
+        const val MIMO = "mimo"
         const val CUSTOM_HTTP = "custom_http"
 
         fun defaultConfigs(): List<ProviderConfig> =
@@ -127,6 +128,13 @@ class ProviderConfigRepository(
                     enabled = false,
                     model = "gemini-2.5-flash-preview-tts",
                     defaultVoice = "Kore",
+                ),
+                ProviderConfig(
+                    providerId = MIMO,
+                    enabled = false,
+                    baseUrl = "https://api.xiaomimimo.com/v1/chat/completions",
+                    model = "mimo-v2.5-tts",
+                    defaultVoice = "mimo_default",
                 ),
                 ProviderConfig(
                     providerId = CUSTOM_HTTP,

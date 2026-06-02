@@ -188,6 +188,7 @@ class HomeViewModel(
                 errorMessage = when {
                     androidUnavailable -> it.androidTtsMessage
                     option.enabled -> null
+                    providerId == ProviderConfigRepository.MIMO -> "MiMo TTS 已加入计划，后续会按小米 MiMo V2.5 TTS 文档接入。"
                     else -> "${option.name} 尚未启用，请先在 Provider 页面保存配置。"
                 },
             )
@@ -396,6 +397,7 @@ class HomeViewModel(
             }
 
             ProviderConfigRepository.GEMINI -> TtsResult.Error("Gemini TTS 会在后续版本接入，请先使用 Custom HTTP。")
+            ProviderConfigRepository.MIMO -> TtsResult.Error("MiMo TTS 已加入计划，后续会按小米 MiMo V2.5 TTS 文档接入。")
             else -> TtsResult.Error("未知 Provider：${request.providerId}")
         }
     }
@@ -424,6 +426,7 @@ class HomeViewModel(
                 ProviderConfigRepository.ANDROID_SYSTEM -> "Android System TTS"
                 ProviderConfigRepository.OPENAI -> "OpenAI-compatible TTS"
                 ProviderConfigRepository.GEMINI -> "Gemini TTS"
+                ProviderConfigRepository.MIMO -> "MiMo TTS"
                 ProviderConfigRepository.CUSTOM_HTTP -> "Custom HTTP TTS"
                 else -> providerId
             },
@@ -436,6 +439,7 @@ class HomeViewModel(
                 providerId == ProviderConfigRepository.ANDROID_SYSTEM && !androidTtsReady ->
                     androidTtsMessage ?: "系统 TTS 不可用"
                 providerId == ProviderConfigRepository.GEMINI -> "后续接入"
+                providerId == ProviderConfigRepository.MIMO -> "计划接入"
                 !enabled -> "未启用"
                 else -> null
             },
@@ -455,6 +459,7 @@ class HomeViewModel(
             }
 
             ProviderConfigRepository.OPENAI -> openAiVoices()
+            ProviderConfigRepository.MIMO -> mimoVoices()
             ProviderConfigRepository.CUSTOM_HTTP -> {
                 val voice = providerConfigs
                     .firstOrNull { it.providerId == ProviderConfigRepository.CUSTOM_HTTP }
@@ -474,6 +479,22 @@ class HomeViewModel(
 
             else -> emptyList()
         }
+
+    private fun mimoVoices(): List<TtsVoice> {
+        val providerId = ProviderConfigRepository.MIMO
+        val configured = providerConfigs.firstOrNull { it.providerId == providerId }?.defaultVoice
+        val defaults = listOf("mimo_default", "冰糖", "茉莉", "苏打", "白桦", "Mia", "Chloe", "Milo", "Dean")
+        return (listOfNotNull(configured?.takeIf { it.isNotBlank() }) + defaults)
+            .distinct()
+            .map { voice ->
+                TtsVoice(
+                    id = voice,
+                    name = voice,
+                    language = null,
+                    providerId = providerId,
+                )
+            }
+    }
 
     private fun openAiVoices(): List<TtsVoice> {
         val providerId = ProviderConfigRepository.OPENAI

@@ -102,7 +102,8 @@ fun ProviderSettingsScreen(
                         checked = state.enabledDraft,
                         onCheckedChange = onEnabledChange,
                         enabled = state.selectedProviderId != ProviderConfigRepository.ANDROID_SYSTEM &&
-                            state.selectedProviderId != ProviderConfigRepository.GEMINI,
+                            state.selectedProviderId != ProviderConfigRepository.GEMINI &&
+                            state.selectedProviderId != ProviderConfigRepository.MIMO,
                     )
                 }
 
@@ -113,6 +114,10 @@ fun ProviderSettingsScreen(
 
                     ProviderConfigRepository.GEMINI -> {
                         Text("Gemini TTS 会在下一步接入。当前可先用 Custom HTTP 配置兼容服务。")
+                    }
+
+                    ProviderConfigRepository.MIMO -> {
+                        Text("MiMo TTS 已加入计划。后续会按小米 MiMo V2.5 TTS 文档接入 chat/completions 格式、预置音色、风格指令和 base64 音频解析。")
                     }
 
                     else -> {
@@ -199,7 +204,12 @@ private fun ProviderSummaryCard(
                     Text(providerLabel(config.providerId), maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
                 Text(
-                    text = if (config.enabled) "已启用" else "未启用",
+                    text = when {
+                        config.providerId == ProviderConfigRepository.GEMINI -> "后续接入"
+                        config.providerId == ProviderConfigRepository.MIMO -> "计划接入"
+                        config.enabled -> "已启用"
+                        else -> "未启用"
+                    },
                     style = MaterialTheme.typography.bodySmall,
                 )
             }
@@ -326,6 +336,7 @@ private fun providerLabel(providerId: String): String =
         ProviderConfigRepository.ANDROID_SYSTEM -> "Android System TTS"
         ProviderConfigRepository.OPENAI -> "OpenAI-compatible TTS"
         ProviderConfigRepository.GEMINI -> "Gemini TTS"
+        ProviderConfigRepository.MIMO -> "MiMo TTS"
         ProviderConfigRepository.CUSTOM_HTTP -> "Custom HTTP TTS"
         else -> providerId
     }

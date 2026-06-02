@@ -131,12 +131,14 @@ class SettingsViewModel(
                 ProviderConfigRepository.ANDROID_SYSTEM -> "Android System TTS"
                 ProviderConfigRepository.OPENAI -> "OpenAI-compatible TTS"
                 ProviderConfigRepository.GEMINI -> "Gemini TTS"
+                ProviderConfigRepository.MIMO -> "MiMo TTS"
                 ProviderConfigRepository.CUSTOM_HTTP -> "Custom HTTP TTS"
                 else -> config.providerId
             },
             enabled = config.enabled,
             note = when {
                 config.providerId == ProviderConfigRepository.GEMINI -> "后续接入"
+                config.providerId == ProviderConfigRepository.MIMO -> "计划接入"
                 !config.enabled -> "未启用"
                 else -> null
             },
