@@ -2,8 +2,10 @@ package com.phrasevoice.data.tts
 
 import android.net.Uri
 import com.phrasevoice.data.local.AudioFileStore
+import com.phrasevoice.data.local.PhraseVoiceJson
 import com.phrasevoice.data.model.CustomHttpResponseType
 import com.phrasevoice.data.model.CustomHttpSettings
+import com.phrasevoice.data.model.MimoSettings
 import com.phrasevoice.data.repository.ProviderConfigRepository
 import com.phrasevoice.data.repository.RuntimeProviderConfig
 import com.phrasevoice.debug.AppLogger
@@ -51,6 +53,68 @@ class CloudTtsService(
             ProviderConfigRepository.MIMO -> synthesizeMimoTts(request, runtimeConfig, cache)
             ProviderConfigRepository.CUSTOM_HTTP -> synthesizeCustomHttp(request, runtimeConfig, cache)
             else -> TtsResult.Error("该 Provider 暂未接入。")
+        }
+    }
+
+    suspend fun optimizeMimoVoiceDesignPrompt(
+        draft: String,
+        runtimeConfig: RuntimeProviderConfig,
+        optimizerModel: String,
+    ): String = withContext(Dispatchers.IO) {
+        val apiKey = runtimeConfig.apiKey
+        if (apiKey.isNullOrBlank()) throw IllegalStateException("请先填写或保存 MiMo API Key。")
+        val baseUrl = runtimeConfig.config.baseUrl?.takeIf { it.isNotBlank() }
+            ?: throw IllegalStateException("请先配置 MiMo Base URL。")
+        val endpoint = mimoChatCompletionsEndpoint(baseUrl)
+            ?: throw IllegalStateException("MiMo Base URL 无效。")
+        val model = optimizerModel.takeIf { it.isNotBlank() }
+            ?: MimoTtsCatalog.DEFAULT_PROMPT_OPTIMIZER_MODEL_ID
+        val body = JsonObject(
+            mapOf(
+                "model" to JsonPrimitive(model),
+                "messages" to JsonArray(
+                    listOf(
+                        JsonObject(
+                            mapOf(
+                                "role" to JsonPrimitive("system"),
+                                "content" to JsonPrimitive(MIMO_PROMPT_OPTIMIZER_SYSTEM),
+                            ),
+                        ),
+                        JsonObject(
+                            mapOf(
+                                "role" to JsonPrimitive("user"),
+                                "content" to JsonPrimitive(
+                                    "请把下面的音色想法改写成适合 MiMo VoiceDesign 的音色描述，只输出最终描述：\n\n$draft",
+                                ),
+                            ),
+                        ),
+                    ),
+                ),
+                "max_completion_tokens" to JsonPrimitive(420),
+                "temperature" to JsonPrimitive(0.7),
+                "top_p" to JsonPrimitive(0.9),
+                "stream" to JsonPrimitive(false),
+                "thinking" to JsonObject(mapOf("type" to JsonPrimitive("disabled"))),
+            ),
+        ).toString()
+        AppLogger.i(TAG, "mimo prompt optimize url=${endpoint.toString().safeUrlForLog()} model=$model")
+        val httpRequest = Request.Builder()
+            .url(endpoint)
+            .addHeader("api-key", apiKey)
+            .addHeader("Content-Type", "application/json")
+            .post(body.toRequestBody(JSON_MEDIA_TYPE))
+            .build()
+
+        runCatching {
+            httpClient.newCall(httpRequest).execute().use { response ->
+                AppLogger.i(TAG, "mimo prompt optimize response code=${response.code}")
+                if (!response.isSuccessful) throw IllegalStateException(response.toCloudErrorMessage())
+                val json = response.body?.string() ?: throw IllegalStateException("MiMo 没有返回 JSON。")
+                MimoChatResponseParser.parseText(json)
+            }
+        }.getOrElse { throwable ->
+            AppLogger.e(TAG, "mimo prompt optimize failed", throwable)
+            throw throwable
         }
     }
 
@@ -199,6 +263,7 @@ class CloudTtsService(
             ?: return TtsResult.Error("请先配置 MiMo Base URL。")
         val endpoint = mimoChatCompletionsEndpoint(baseUrl)
             ?: return TtsResult.Error("MiMo Base URL 无效。")
+        val settings = PhraseVoiceJson.decode(config.extraJson, MimoSettings())
         val target = audioFileStore.createTarget(AudioFormat.WAV, cache = cache)
         val voiceDesign = MimoTtsCatalog.isVoiceDesignModel(model)
         val voiceOrDescription = request.voiceId ?: config.defaultVoice
@@ -232,7 +297,7 @@ class CloudTtsService(
             JsonObject(
                 mapOf(
                     "format" to JsonPrimitive(AudioFormat.WAV.extension),
-                    "optimize_text_preview" to JsonPrimitive(false),
+                    "optimize_text_preview" to JsonPrimitive(settings.optimizeTextPreview),
                 ),
             )
         } else {
@@ -503,7 +568,13 @@ class CloudTtsService(
         (value.coerceIn(0.0f, 1.0f) * 100).roundToInt().coerceIn(0, 100)
 
     private fun okhttp3.Response.toTtsError(): TtsResult.Error {
-        val message = when (code) {
+        val message = toCloudErrorMessage()
+        AppLogger.w(TAG, "request error code=$code url=${request.url.toString().safeUrlForLog()}")
+        return TtsResult.Error(message)
+    }
+
+    private fun okhttp3.Response.toCloudErrorMessage(): String =
+        when (code) {
             401 -> "认证失败：请检查 API Key 或 Token。"
             402 -> "账户余额或配额不足。"
             404 -> "接口地址不存在，请检查 Base URL。"
@@ -511,12 +582,13 @@ class CloudTtsService(
             in 500..599 -> "服务端暂时不可用：HTTP $code。"
             else -> "请求失败：HTTP $code。"
         }
-        AppLogger.w(TAG, "request error code=$code url=${request.url.toString().safeUrlForLog()}")
-        return TtsResult.Error(message)
-    }
 
     companion object {
         private const val TAG = "CloudTtsService"
+        private const val MIMO_PROMPT_OPTIMIZER_SYSTEM =
+            "你是专业的语音角色设定编辑。你的任务是把用户的简短想法改写为适合 MiMo VoiceDesign 的音色描述。" +
+                "描述需要覆盖角色身份、年龄/性别、音色质感、情绪语气、语速节奏、口音或场景。" +
+                "不要解释，不要列点，不要加标题，只输出一段自然中文描述，控制在 120 字以内。"
         private val JSON_MEDIA_TYPE = "application/json; charset=utf-8".toMediaType()
     }
 }

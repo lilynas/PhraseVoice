@@ -46,7 +46,8 @@
 - Voice description input: collect role/persona, age/gender, timbre, emotion, rhythm, accent/dialect, and optional scene notes as a reusable local preset. Initial implementation stores one default description in Provider settings; a multi-preset library remains future work.
 - Request shape: place the voice design description in the required `user` message and the preview/synthesis text in the `assistant` message. Done.
 - Preview flow: synthesize a short sample, allow retrying the same description, then save the character voice preset for later phrase reading. Initial Provider "save and test" preview is implemented.
-- Optional text preview: support MiMo's `audio.optimize_text_preview` flag so the preview text can be improved for the designed voice when the user opts in.
+- Add one-click VoiceDesign description optimization through a MiMo chat model. Done.
+- Optional text preview: support MiMo's `audio.optimize_text_preview` flag so the preview text can be improved for the designed voice when the user opts in. Done.
 - Initial scope excludes voice cloning uploads; VoiceClone can be added later after privacy, file-size, and consent UX are designed.
 
 ## Phase 3 Polish

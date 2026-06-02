@@ -16,6 +16,7 @@ data class MimoTtsVoice(
 object MimoTtsCatalog {
     const val PRESET_MODEL_ID = "mimo-v2.5-tts"
     const val VOICE_DESIGN_MODEL_ID = "mimo-v2.5-tts-voicedesign"
+    const val DEFAULT_PROMPT_OPTIMIZER_MODEL_ID = "mimo-v2.5"
     const val DEFAULT_VOICE_ID = "mimo_default"
     const val DEFAULT_VOICE_DESIGN_PROMPT =
         "一位温暖、清晰、亲切的中文旁白，语速自然，声音干净，有轻微的治愈感。"

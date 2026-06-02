@@ -60,6 +60,9 @@ fun ProviderSettingsScreen(
     onBodyChange: (String) -> Unit,
     onResponseTypeChange: (CustomHttpResponseType) -> Unit,
     onResponseFieldChange: (String) -> Unit,
+    onMimoOptimizeTextPreviewChange: (Boolean) -> Unit,
+    onMimoPromptOptimizerModelChange: (String) -> Unit,
+    onOptimizeMimoVoiceDesign: () -> Unit,
     onSave: () -> Unit,
     onTestVoice: () -> Unit,
     modifier: Modifier = Modifier,
@@ -187,14 +190,12 @@ fun ProviderSettingsScreen(
                                 onVoiceChange = onVoiceChange,
                             )
                         } else if (state.isMimoVoiceDesign) {
-                            OutlinedTextField(
-                                value = state.voiceDraft,
-                                onValueChange = onVoiceChange,
-                                label = { Text("VoiceDesign 音色描述") },
-                                minLines = 4,
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .heightIn(min = 136.dp),
+                            MimoVoiceDesignFields(
+                                state = state,
+                                onVoiceChange = onVoiceChange,
+                                onMimoOptimizeTextPreviewChange = onMimoOptimizeTextPreviewChange,
+                                onMimoPromptOptimizerModelChange = onMimoPromptOptimizerModelChange,
+                                onOptimizeMimoVoiceDesign = onOptimizeMimoVoiceDesign,
                             )
                         } else if (state.isMimo) {
                             MimoVoiceDropdown(
@@ -224,7 +225,7 @@ fun ProviderSettingsScreen(
 
                         Button(
                             onClick = onSave,
-                            enabled = !state.isTesting,
+                            enabled = !state.isTesting && !state.isOptimizingVoiceDesign,
                             modifier = Modifier.fillMaxWidth(),
                         ) {
                             Icon(Icons.Outlined.Save, contentDescription = null)
@@ -232,7 +233,7 @@ fun ProviderSettingsScreen(
                         }
                         OutlinedButton(
                             onClick = onTestVoice,
-                            enabled = !state.isTesting,
+                            enabled = !state.isTesting && !state.isOptimizingVoiceDesign,
                             modifier = Modifier.fillMaxWidth(),
                         ) {
                             Icon(Icons.Outlined.PlayArrow, contentDescription = null)
@@ -242,6 +243,56 @@ fun ProviderSettingsScreen(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun MimoVoiceDesignFields(
+    state: ProviderSettingsUiState,
+    onVoiceChange: (String) -> Unit,
+    onMimoOptimizeTextPreviewChange: (Boolean) -> Unit,
+    onMimoPromptOptimizerModelChange: (String) -> Unit,
+    onOptimizeMimoVoiceDesign: () -> Unit,
+) {
+    OutlinedTextField(
+        value = state.voiceDraft,
+        onValueChange = onVoiceChange,
+        label = { Text("VoiceDesign 音色描述") },
+        minLines = 4,
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = 136.dp),
+    )
+    OutlinedTextField(
+        value = state.mimoPromptOptimizerModelDraft,
+        onValueChange = onMimoPromptOptimizerModelChange,
+        label = { Text("描述优化模型") },
+        singleLine = true,
+        modifier = Modifier.fillMaxWidth(),
+    )
+    OutlinedButton(
+        onClick = onOptimizeMimoVoiceDesign,
+        enabled = !state.isTesting &&
+            !state.isOptimizingVoiceDesign &&
+            state.voiceDraft.isNotBlank(),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Icon(Icons.Outlined.Tune, contentDescription = null)
+        Text(if (state.isOptimizingVoiceDesign) "优化中" else "优化音色描述")
+    }
+    Row {
+        Column(modifier = Modifier.weight(1f)) {
+            Text("试听文本智能优化")
+            Text(
+                "开启后 MiMo 会在 VoiceDesign 试听/朗读时优化目标文本；音色描述仍以上方内容为准。",
+                style = MaterialTheme.typography.bodySmall,
+            )
+        }
+        Switch(
+            checked = state.mimoOptimizeTextPreviewDraft,
+            onCheckedChange = onMimoOptimizeTextPreviewChange,
+            enabled = !state.isTesting && !state.isOptimizingVoiceDesign,
+        )
     }
 }
 

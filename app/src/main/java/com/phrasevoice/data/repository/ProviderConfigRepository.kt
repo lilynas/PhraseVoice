@@ -7,6 +7,7 @@ import com.phrasevoice.data.local.PhraseVoiceJson
 import com.phrasevoice.data.local.PhraseVoicePreferenceKeys
 import com.phrasevoice.data.local.safeData
 import com.phrasevoice.data.model.CustomHttpSettings
+import com.phrasevoice.data.model.MimoSettings
 import com.phrasevoice.data.model.ProviderConfig
 import com.phrasevoice.data.security.ApiKeyCipher
 import com.phrasevoice.data.tts.EdgeForwarderCatalog
@@ -146,6 +147,7 @@ class ProviderConfigRepository(
                     baseUrl = "https://api.xiaomimimo.com/v1/chat/completions",
                     model = MimoTtsCatalog.PRESET_MODEL_ID,
                     defaultVoice = MimoTtsCatalog.DEFAULT_VOICE_ID,
+                    extraJson = PhraseVoiceJson.encode(MimoSettings()),
                 ),
                 ProviderConfig(
                     providerId = CUSTOM_HTTP,

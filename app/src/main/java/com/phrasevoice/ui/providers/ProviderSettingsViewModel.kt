@@ -5,8 +5,10 @@ import androidx.lifecycle.viewModelScope
 import com.phrasevoice.data.local.PhraseVoiceJson
 import com.phrasevoice.data.model.CustomHttpResponseType
 import com.phrasevoice.data.model.CustomHttpSettings
+import com.phrasevoice.data.model.MimoSettings
 import com.phrasevoice.data.model.ProviderConfig
 import com.phrasevoice.data.repository.ProviderConfigRepository
+import com.phrasevoice.data.repository.RuntimeProviderConfig
 import com.phrasevoice.data.tts.AudioPlaybackController
 import com.phrasevoice.data.tts.CloudTtsService
 import com.phrasevoice.data.tts.MimoTtsCatalog
@@ -33,8 +35,11 @@ data class ProviderSettingsUiState(
     val bodyDraft: String = "",
     val responseTypeDraft: CustomHttpResponseType = CustomHttpResponseType.RAW_AUDIO,
     val responseFieldDraft: String = "audio",
+    val mimoOptimizeTextPreviewDraft: Boolean = false,
+    val mimoPromptOptimizerModelDraft: String = MimoTtsCatalog.DEFAULT_PROMPT_OPTIMIZER_MODEL_ID,
     val savedMessage: String? = null,
     val isTesting: Boolean = false,
+    val isOptimizingVoiceDesign: Boolean = false,
 ) {
     val selectedConfig: ProviderConfig?
         get() = configs.firstOrNull { it.providerId == selectedProviderId }
@@ -113,6 +118,61 @@ class ProviderSettingsViewModel(
     fun updateResponseFieldDraft(value: String) =
         _uiState.update { it.copy(responseFieldDraft = value, savedMessage = null) }
 
+    fun updateMimoOptimizeTextPreviewDraft(value: Boolean) =
+        _uiState.update { it.copy(mimoOptimizeTextPreviewDraft = value, savedMessage = null) }
+
+    fun updateMimoPromptOptimizerModelDraft(value: String) =
+        _uiState.update { it.copy(mimoPromptOptimizerModelDraft = value, savedMessage = null) }
+
+    fun optimizeMimoVoiceDesignPrompt() {
+        val state = uiState.value
+        if (!state.isMimoVoiceDesign) {
+            _uiState.update { it.copy(savedMessage = "请先切换到 MiMo VoiceDesign 模式") }
+            return
+        }
+        if (state.voiceDraft.isBlank()) {
+            _uiState.update { it.copy(savedMessage = "请先填写音色描述") }
+            return
+        }
+
+        viewModelScope.launch {
+            _uiState.update {
+                it.copy(
+                    isOptimizingVoiceDesign = true,
+                    savedMessage = "正在优化音色描述",
+                )
+            }
+            runCatching {
+                val runtimeConfig = runtimeConfigFromDraft(state)
+                cloudTtsService.optimizeMimoVoiceDesignPrompt(
+                    draft = state.voiceDraft,
+                    runtimeConfig = runtimeConfig,
+                    optimizerModel = state.mimoPromptOptimizerModelDraft,
+                )
+            }.fold(
+                onSuccess = { optimized ->
+                    _uiState.update {
+                        it.copy(
+                            voiceDraft = optimized,
+                            savedMessage = "已优化音色描述，请保存配置",
+                            isOptimizingVoiceDesign = false,
+                        )
+                    }
+                    AppLogger.i(TAG, "mimo voice design prompt optimized")
+                },
+                onFailure = { throwable ->
+                    _uiState.update {
+                        it.copy(
+                            savedMessage = "优化失败：${throwable.message ?: "未知错误"}",
+                            isOptimizingVoiceDesign = false,
+                        )
+                    }
+                    AppLogger.e(TAG, "mimo voice design prompt optimize failed", throwable)
+                },
+            )
+        }
+    }
+
     fun save() {
         val state = uiState.value
         AppLogger.i(
@@ -128,6 +188,7 @@ class ProviderSettingsViewModel(
                     hasSavedApiKey = it.hasSavedApiKey || state.apiKeyDraft.isNotBlank(),
                     savedMessage = "已保存",
                     isTesting = false,
+                    isOptimizingVoiceDesign = false,
                 )
             }
             AppLogger.i(TAG, "save complete provider=${state.selectedProviderId}")
@@ -212,22 +273,51 @@ class ProviderSettingsViewModel(
     }
 
     private fun extraJsonFor(state: ProviderSettingsUiState): String? =
-        if (state.isCustomHttp) {
-            PhraseVoiceJson.encode(
-                CustomHttpSettings(
-                    method = state.methodDraft.ifBlank { "POST" },
-                    headersTemplate = state.headersDraft,
-                    bodyTemplate = state.bodyDraft,
-                    responseType = state.responseTypeDraft,
-                    responseField = state.responseFieldDraft.ifBlank { "audio" },
-                ),
-            )
-        } else {
-            state.selectedConfig?.extraJson
+        when {
+            state.isCustomHttp -> {
+                PhraseVoiceJson.encode(
+                    CustomHttpSettings(
+                        method = state.methodDraft.ifBlank { "POST" },
+                        headersTemplate = state.headersDraft,
+                        bodyTemplate = state.bodyDraft,
+                        responseType = state.responseTypeDraft,
+                        responseField = state.responseFieldDraft.ifBlank { "audio" },
+                    ),
+                )
+            }
+
+            state.isMimo -> {
+                PhraseVoiceJson.encode(
+                    MimoSettings(
+                        optimizeTextPreview = state.mimoOptimizeTextPreviewDraft,
+                        promptOptimizerModel = state.mimoPromptOptimizerModelDraft
+                            .ifBlank { MimoTtsCatalog.DEFAULT_PROMPT_OPTIMIZER_MODEL_ID },
+                    ),
+                )
+            }
+
+            else -> {
+                state.selectedConfig?.extraJson
+            }
         }
+
+    private suspend fun runtimeConfigFromDraft(state: ProviderSettingsUiState): RuntimeProviderConfig {
+        val saved = providerConfigRepository.getRuntimeConfig(state.selectedProviderId)
+        return saved.copy(
+            config = saved.config.copy(
+                enabled = state.enabledDraft,
+                baseUrl = state.baseUrlDraft.trim().takeIf { it.isNotBlank() },
+                model = state.modelDraft.trim().takeIf { it.isNotBlank() },
+                defaultVoice = state.voiceDraft.trim().takeIf { it.isNotBlank() },
+                extraJson = extraJsonFor(state),
+            ),
+            apiKey = state.apiKeyDraft.takeIf { it.isNotBlank() } ?: saved.apiKey,
+        )
+    }
 
     private fun ProviderSettingsUiState.withSelectedConfig(config: ProviderConfig): ProviderSettingsUiState {
         val customSettings = PhraseVoiceJson.decode(config.extraJson, CustomHttpSettings())
+        val mimoSettings = PhraseVoiceJson.decode(config.extraJson, MimoSettings())
         val modelDraft = config.model.orEmpty()
         val voiceDraft = if (
             config.providerId == ProviderConfigRepository.MIMO &&
@@ -251,6 +341,10 @@ class ProviderSettingsViewModel(
             bodyDraft = customSettings.bodyTemplate,
             responseTypeDraft = customSettings.responseType,
             responseFieldDraft = customSettings.responseField,
+            mimoOptimizeTextPreviewDraft = mimoSettings.optimizeTextPreview,
+            mimoPromptOptimizerModelDraft = mimoSettings.promptOptimizerModel
+                .ifBlank { MimoTtsCatalog.DEFAULT_PROMPT_OPTIMIZER_MODEL_ID },
+            isOptimizingVoiceDesign = false,
         )
     }
 

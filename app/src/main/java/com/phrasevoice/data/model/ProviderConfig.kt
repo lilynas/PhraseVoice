@@ -26,6 +26,12 @@ data class CustomHttpSettings(
 )
 
 @Serializable
+data class MimoSettings(
+    val optimizeTextPreview: Boolean = false,
+    val promptOptimizerModel: String = "mimo-v2.5",
+)
+
+@Serializable
 enum class CustomHttpResponseType {
     RAW_AUDIO,
     JSON_BASE64_FIELD,
