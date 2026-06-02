@@ -129,6 +129,57 @@ class ProviderSettingsViewModel(
     fun updateResponseFieldDraft(value: String) =
         _uiState.update { it.copy(responseFieldDraft = value, savedMessage = null) }
 
+    fun applyCustomHttpTemplate(presetName: String) {
+        val preset = when (presetName) {
+            "OpenAI" -> HttpPreset(
+                url = "https://api.openai.com/v1/audio/speech",
+                method = "POST",
+                headers = "Authorization: Bearer {{ apiKey }}\nContent-Type: application/json",
+                body = "{\n  \"model\": \"{{ model }}\",\n  \"input\": \"{{ text }}\",\n  \"voice\": \"{{ voice }}\"\n}",
+                responseType = CustomHttpResponseType.RAW_AUDIO,
+                responseField = "audio"
+            )
+            "MiniMax" -> HttpPreset(
+                url = "https://api.minimax.chat/v1/t2a_v2?GroupId=YOUR_GROUP_ID",
+                method = "POST",
+                headers = "Authorization: Bearer {{ apiKey }}\nContent-Type: application/json",
+                body = "{\n  \"model\": \"{{ model }}\",\n  \"text\": \"{{ text }}\",\n  \"voice_setting\": {\n    \"voice_id\": \"{{ voice }}\"\n  },\n  \"audio_setting\": {\n    \"sample_rate\": 24000,\n    \"bitrate\": 128000,\n    \"format\": \"mp3\"\n  }\n}",
+                responseType = CustomHttpResponseType.JSON_BASE64_FIELD,
+                responseField = "data.audio"
+            )
+            "Volcengine" -> HttpPreset(
+                url = "https://openspeech.bytedance.com/api/v1/tts",
+                method = "POST",
+                headers = "Authorization: Bearer {{ apiKey }}\nContent-Type: application/json",
+                body = "{\n  \"app\": {\n    \"appid\": \"YOUR_APPID\",\n    \"token\": \"{{ apiKey }}\",\n    \"cluster\": \"volc_tts_outdoor\"\n  },\n  \"user\": {\n    \"uid\": \"12345\"\n  },\n  \"audio\": {\n    \"voice_type\": \"{{ voice }}\",\n    \"encoding\": \"mp3\"\n  },\n  \"request\": {\n    \"reqid\": \"12345\",\n    \"text\": \"{{ text }}\",\n    \"text_type\": \"plain\",\n    \"operation\": \"query\"\n  }\n}",
+                responseType = CustomHttpResponseType.JSON_BASE64_FIELD,
+                responseField = "data"
+            )
+            else -> return
+        }
+
+        _uiState.update {
+            it.copy(
+                baseUrlDraft = preset.url,
+                methodDraft = preset.method,
+                headersDraft = preset.headers,
+                bodyDraft = preset.body,
+                responseTypeDraft = preset.responseType,
+                responseFieldDraft = preset.responseField,
+                savedMessage = "已应用 $presetName 模板"
+            )
+        }
+    }
+
+    private data class HttpPreset(
+        val url: String,
+        val method: String,
+        val headers: String,
+        val body: String,
+        val responseType: CustomHttpResponseType,
+        val responseField: String
+    )
+
     fun updateMimoOptimizeTextPreviewDraft(value: Boolean) =
         _uiState.update { it.copy(mimoOptimizeTextPreviewDraft = value, savedMessage = null) }
 

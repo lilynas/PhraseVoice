@@ -31,11 +31,18 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
+import androidx.compose.material.icons.outlined.ExpandLess
+import androidx.compose.material.icons.outlined.ExpandMore
+import androidx.compose.material3.CardDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
@@ -62,6 +69,7 @@ fun ProviderSettingsScreen(
     onBodyChange: (String) -> Unit,
     onResponseTypeChange: (CustomHttpResponseType) -> Unit,
     onResponseFieldChange: (String) -> Unit,
+    onApplyTemplate: (String) -> Unit,
     onMimoOptimizeTextPreviewChange: (Boolean) -> Unit,
     onMimoPromptOptimizerModelChange: (String) -> Unit,
     onMimoUseStreamingChange: (Boolean) -> Unit,
@@ -237,6 +245,7 @@ fun ProviderSettingsScreen(
                                 onBodyChange = onBodyChange,
                                 onResponseTypeChange = onResponseTypeChange,
                                 onResponseFieldChange = onResponseFieldChange,
+                                onApplyTemplate = onApplyTemplate,
                             )
                         }
 
@@ -683,97 +692,159 @@ private fun CustomHttpFields(
     onBodyChange: (String) -> Unit,
     onResponseTypeChange: (CustomHttpResponseType) -> Unit,
     onResponseFieldChange: (String) -> Unit,
+    onApplyTemplate: (String) -> Unit,
 ) {
+    var showAdvanced by remember { mutableStateOf(false) }
     var methodExpanded by remember { mutableStateOf(false) }
     var responseExpanded by remember { mutableStateOf(false) }
 
-    ExposedDropdownMenuBox(
-        expanded = methodExpanded,
-        onExpandedChange = { methodExpanded = !methodExpanded },
-    ) {
-        OutlinedTextField(
-            modifier = Modifier
-                .menuAnchor()
-                .fillMaxWidth(),
-            readOnly = true,
-            value = state.methodDraft,
-            onValueChange = {},
-            label = { Text("HTTP Method") },
-            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = methodExpanded) },
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Text(
+            text = "一键填充常用接口模板",
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.primary,
         )
-        ExposedDropdownMenu(
-            expanded = methodExpanded,
-            onDismissRequest = { methodExpanded = false },
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.fillMaxWidth()
         ) {
-            listOf("POST", "GET", "PUT").forEach { method ->
-                DropdownMenuItem(
-                    text = { Text(method) },
-                    onClick = {
-                        methodExpanded = false
-                        onMethodChange(method)
-                    },
-                )
+            AssistChip(
+                onClick = { onApplyTemplate("OpenAI") },
+                label = { Text("OpenAI / 兼容") }
+            )
+            AssistChip(
+                onClick = { onApplyTemplate("MiniMax") },
+                label = { Text("MiniMax") }
+            )
+            AssistChip(
+                onClick = { onApplyTemplate("Volcengine") },
+                label = { Text("火山引擎") }
+            )
+        }
+
+        Card(
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+            ),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(12.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { showAdvanced = !showAdvanced }
+                ) {
+                    Text(
+                        text = "高级 HTTP 协议参数设置",
+                        style = MaterialTheme.typography.titleMedium,
+                        modifier = Modifier.weight(1f)
+                    )
+                    Icon(
+                        imageVector = if (showAdvanced) Icons.Outlined.ExpandLess else Icons.Outlined.ExpandMore,
+                        contentDescription = if (showAdvanced) "收起" else "展开"
+                    )
+                }
+
+                if (showAdvanced) {
+                    Spacer(modifier = Modifier.height(4.dp))
+
+                    ExposedDropdownMenuBox(
+                        expanded = methodExpanded,
+                        onExpandedChange = { methodExpanded = !methodExpanded },
+                    ) {
+                        OutlinedTextField(
+                            modifier = Modifier
+                                .menuAnchor()
+                                .fillMaxWidth(),
+                            readOnly = true,
+                            value = state.methodDraft,
+                            onValueChange = {},
+                            label = { Text("HTTP Method") },
+                            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = methodExpanded) },
+                        )
+                        ExposedDropdownMenu(
+                            expanded = methodExpanded,
+                            onDismissRequest = { methodExpanded = false },
+                        ) {
+                            listOf("POST", "GET", "PUT").forEach { method ->
+                                DropdownMenuItem(
+                                    text = { Text(method) },
+                                    onClick = {
+                                        methodExpanded = false
+                                        onMethodChange(method)
+                                    },
+                                )
+                            }
+                        }
+                    }
+
+                    OutlinedTextField(
+                        value = state.headersDraft,
+                        onValueChange = onHeadersChange,
+                        label = { Text("Headers 模板") },
+                        minLines = 3,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(min = 104.dp),
+                    )
+                    OutlinedTextField(
+                        value = state.bodyDraft,
+                        onValueChange = onBodyChange,
+                        label = { Text("JSON Body 模板") },
+                        minLines = 5,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(min = 144.dp),
+                    )
+
+                    ExposedDropdownMenuBox(
+                        expanded = responseExpanded,
+                        onExpandedChange = { responseExpanded = !responseExpanded },
+                    ) {
+                        OutlinedTextField(
+                            modifier = Modifier
+                                .menuAnchor()
+                                .fillMaxWidth(),
+                            readOnly = true,
+                            value = responseTypeLabel(state.responseTypeDraft),
+                            onValueChange = {},
+                            label = { Text("Response 类型") },
+                            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = responseExpanded) },
+                        )
+                        ExposedDropdownMenu(
+                            expanded = responseExpanded,
+                            onDismissRequest = { responseExpanded = false },
+                        ) {
+                            CustomHttpResponseType.entries.forEach { type ->
+                                DropdownMenuItem(
+                                    text = { Text(responseTypeLabel(type)) },
+                                    onClick = {
+                                        responseExpanded = false
+                                        onResponseTypeChange(type)
+                                    },
+                                )
+                            }
+                        }
+                    }
+
+                    if (state.responseTypeDraft != CustomHttpResponseType.RAW_AUDIO) {
+                        OutlinedTextField(
+                            value = state.responseFieldDraft,
+                            onValueChange = onResponseFieldChange,
+                            label = { Text("JSON 字段路径") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    }
+                }
             }
         }
-    }
-
-    OutlinedTextField(
-        value = state.headersDraft,
-        onValueChange = onHeadersChange,
-        label = { Text("Headers 模板") },
-        minLines = 3,
-        modifier = Modifier
-            .fillMaxWidth()
-            .heightIn(min = 104.dp),
-    )
-    OutlinedTextField(
-        value = state.bodyDraft,
-        onValueChange = onBodyChange,
-        label = { Text("JSON Body 模板") },
-        minLines = 5,
-        modifier = Modifier
-            .fillMaxWidth()
-            .heightIn(min = 144.dp),
-    )
-
-    ExposedDropdownMenuBox(
-        expanded = responseExpanded,
-        onExpandedChange = { responseExpanded = !responseExpanded },
-    ) {
-        OutlinedTextField(
-            modifier = Modifier
-                .menuAnchor()
-                .fillMaxWidth(),
-            readOnly = true,
-            value = responseTypeLabel(state.responseTypeDraft),
-            onValueChange = {},
-            label = { Text("Response 类型") },
-            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = responseExpanded) },
-        )
-        ExposedDropdownMenu(
-            expanded = responseExpanded,
-            onDismissRequest = { responseExpanded = false },
-        ) {
-            CustomHttpResponseType.entries.forEach { type ->
-                DropdownMenuItem(
-                    text = { Text(responseTypeLabel(type)) },
-                    onClick = {
-                        responseExpanded = false
-                        onResponseTypeChange(type)
-                    },
-                )
-            }
-        }
-    }
-
-    if (state.responseTypeDraft != CustomHttpResponseType.RAW_AUDIO) {
-        OutlinedTextField(
-            value = state.responseFieldDraft,
-            onValueChange = onResponseFieldChange,
-            label = { Text("JSON 字段路径") },
-            singleLine = true,
-            modifier = Modifier.fillMaxWidth(),
-        )
     }
 }
 

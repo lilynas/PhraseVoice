@@ -146,6 +146,7 @@ fun PhraseVoiceRoot(container: AppContainer) {
                 onBodyChange = providerSettingsViewModel::updateBodyDraft,
                 onResponseTypeChange = providerSettingsViewModel::updateResponseTypeDraft,
                 onResponseFieldChange = providerSettingsViewModel::updateResponseFieldDraft,
+                onApplyTemplate = providerSettingsViewModel::applyCustomHttpTemplate,
                 onMimoOptimizeTextPreviewChange = providerSettingsViewModel::updateMimoOptimizeTextPreviewDraft,
                 onMimoPromptOptimizerModelChange = providerSettingsViewModel::updateMimoPromptOptimizerModelDraft,
                 onMimoUseStreamingChange = providerSettingsViewModel::updateMimoUseStreamingDraft,
