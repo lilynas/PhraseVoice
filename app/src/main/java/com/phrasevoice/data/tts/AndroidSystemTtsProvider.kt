@@ -77,7 +77,7 @@ class AndroidSystemTtsProvider(
         val voices = textToSpeech.voices.orEmpty()
         if (voices.isEmpty()) return@withContext defaultVoice()
 
-        voices
+        val engineVoices = voices
             .sortedWith(compareBy({ it.locale?.toLanguageTag().orEmpty() }, { it.name }))
             .map { voice ->
                 TtsVoice(
@@ -92,6 +92,7 @@ class AndroidSystemTtsProvider(
                     providerId = id,
                 )
             }
+        defaultVoice() + engineVoices
     }
 
     fun listEngines(): List<AndroidTtsEngine> =
