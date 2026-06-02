@@ -16,6 +16,7 @@ captures/
 local.properties
 
 # 构建产物
+artifacts/
 *.apk
 *.aab
 *.ap_
