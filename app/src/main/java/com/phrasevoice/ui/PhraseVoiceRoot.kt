@@ -130,6 +130,7 @@ fun PhraseVoiceRoot(container: AppContainer) {
                 onResponseTypeChange = providerSettingsViewModel::updateResponseTypeDraft,
                 onResponseFieldChange = providerSettingsViewModel::updateResponseFieldDraft,
                 onSave = providerSettingsViewModel::save,
+                onTestVoice = providerSettingsViewModel::saveAndTestVoice,
                 modifier = modifier,
             )
 

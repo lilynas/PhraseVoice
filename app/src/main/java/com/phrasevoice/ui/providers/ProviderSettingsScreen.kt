@@ -12,6 +12,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Cloud
 import androidx.compose.material.icons.outlined.PhoneAndroid
+import androidx.compose.material.icons.outlined.PlayArrow
 import androidx.compose.material.icons.outlined.Save
 import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material3.AssistChip
@@ -24,6 +25,7 @@ import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -56,6 +58,7 @@ fun ProviderSettingsScreen(
     onResponseTypeChange: (CustomHttpResponseType) -> Unit,
     onResponseFieldChange: (String) -> Unit,
     onSave: () -> Unit,
+    onTestVoice: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -159,10 +162,19 @@ fun ProviderSettingsScreen(
 
                         Button(
                             onClick = onSave,
+                            enabled = !state.isTesting,
                             modifier = Modifier.fillMaxWidth(),
                         ) {
                             Icon(Icons.Outlined.Save, contentDescription = null)
                             Text("保存配置")
+                        }
+                        OutlinedButton(
+                            onClick = onTestVoice,
+                            enabled = !state.isTesting,
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Icon(Icons.Outlined.PlayArrow, contentDescription = null)
+                            Text(if (state.isTesting) "试听中" else "保存并试听")
                         }
                     }
                 }

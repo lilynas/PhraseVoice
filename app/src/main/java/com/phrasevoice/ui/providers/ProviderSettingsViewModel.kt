@@ -7,7 +7,12 @@ import com.phrasevoice.data.model.CustomHttpResponseType
 import com.phrasevoice.data.model.CustomHttpSettings
 import com.phrasevoice.data.model.ProviderConfig
 import com.phrasevoice.data.repository.ProviderConfigRepository
+import com.phrasevoice.data.tts.AudioPlaybackController
+import com.phrasevoice.data.tts.CloudTtsService
 import com.phrasevoice.debug.AppLogger
+import com.phrasevoice.domain.model.AudioFormat
+import com.phrasevoice.domain.tts.TtsRequest
+import com.phrasevoice.domain.tts.TtsResult
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
@@ -28,6 +33,7 @@ data class ProviderSettingsUiState(
     val responseTypeDraft: CustomHttpResponseType = CustomHttpResponseType.RAW_AUDIO,
     val responseFieldDraft: String = "audio",
     val savedMessage: String? = null,
+    val isTesting: Boolean = false,
 ) {
     val selectedConfig: ProviderConfig?
         get() = configs.firstOrNull { it.providerId == selectedProviderId }
@@ -38,6 +44,8 @@ data class ProviderSettingsUiState(
 
 class ProviderSettingsViewModel(
     private val providerConfigRepository: ProviderConfigRepository,
+    private val cloudTtsService: CloudTtsService,
+    private val audioPlaybackController: AudioPlaybackController,
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(ProviderSettingsUiState())
     val uiState: StateFlow<ProviderSettingsUiState> = _uiState
@@ -85,7 +93,97 @@ class ProviderSettingsViewModel(
             TAG,
             "save provider=${state.selectedProviderId} enabled=${state.enabledDraft} baseUrlSet=${state.baseUrlDraft.isNotBlank()} model=${state.modelDraft} voice=${state.voiceDraft} apiKeyChanged=${state.apiKeyDraft.isNotBlank()}",
         )
-        val extraJson = if (state.isCustomHttp) {
+
+        viewModelScope.launch {
+            saveDraft(state)
+            _uiState.update {
+                it.copy(
+                    apiKeyDraft = "",
+                    hasSavedApiKey = it.hasSavedApiKey || state.apiKeyDraft.isNotBlank(),
+                    savedMessage = "已保存",
+                    isTesting = false,
+                )
+            }
+            AppLogger.i(TAG, "save complete provider=${state.selectedProviderId}")
+        }
+    }
+
+    fun saveAndTestVoice() {
+        val state = uiState.value
+        if (state.selectedProviderId != ProviderConfigRepository.OPENAI &&
+            state.selectedProviderId != ProviderConfigRepository.CUSTOM_HTTP
+        ) {
+            _uiState.update { it.copy(savedMessage = "当前 Provider 不需要云端试听") }
+            return
+        }
+
+        viewModelScope.launch {
+            _uiState.update { it.copy(isTesting = true, savedMessage = "正在保存并试听") }
+            runCatching {
+                saveDraft(state)
+                val runtimeConfig = providerConfigRepository.getRuntimeConfig(state.selectedProviderId)
+                val request = TtsRequest(
+                    text = TEST_TEXT,
+                    providerId = state.selectedProviderId,
+                    voiceId = state.voiceDraft.takeIf { it.isNotBlank() },
+                    language = null,
+                    speed = 1.0f,
+                    pitch = 1.0f,
+                    volume = 1.0f,
+                    stylePrompt = "自然、清晰、适合日常交流",
+                    outputFormat = AudioFormat.MP3,
+                )
+                when (val result = cloudTtsService.synthesize(request, runtimeConfig, cache = true)) {
+                    is TtsResult.AudioFile -> {
+                        audioPlaybackController.play(result.uri)
+                        _uiState.update {
+                            it.copy(
+                                apiKeyDraft = "",
+                                hasSavedApiKey = it.hasSavedApiKey || state.apiKeyDraft.isNotBlank(),
+                                savedMessage = "试听已播放",
+                                isTesting = false,
+                            )
+                        }
+                        AppLogger.i(TAG, "test playback started provider=${state.selectedProviderId}")
+                    }
+
+                    is TtsResult.Error -> {
+                        _uiState.update {
+                            it.copy(savedMessage = "试听失败：${result.message}", isTesting = false)
+                        }
+                        AppLogger.e(TAG, "test failed provider=${state.selectedProviderId}: ${result.message}", result.cause)
+                    }
+
+                    is TtsResult.LocalPlaybackStarted -> {
+                        _uiState.update { it.copy(savedMessage = "试听已播放", isTesting = false) }
+                    }
+                }
+            }.getOrElse { throwable ->
+                _uiState.update {
+                    it.copy(
+                        savedMessage = "试听失败：${throwable.message ?: "未知错误"}",
+                        isTesting = false,
+                    )
+                }
+                AppLogger.e(TAG, "test failed provider=${state.selectedProviderId}", throwable)
+            }
+        }
+    }
+
+    private suspend fun saveDraft(state: ProviderSettingsUiState) {
+        providerConfigRepository.saveConfig(
+            providerId = state.selectedProviderId,
+            enabled = state.enabledDraft,
+            apiKeyPlainText = state.apiKeyDraft.takeIf { it.isNotBlank() },
+            baseUrl = state.baseUrlDraft,
+            model = state.modelDraft,
+            defaultVoice = state.voiceDraft,
+            extraJson = extraJsonFor(state),
+        )
+    }
+
+    private fun extraJsonFor(state: ProviderSettingsUiState): String? =
+        if (state.isCustomHttp) {
             PhraseVoiceJson.encode(
                 CustomHttpSettings(
                     method = state.methodDraft.ifBlank { "POST" },
@@ -98,27 +196,6 @@ class ProviderSettingsViewModel(
         } else {
             state.selectedConfig?.extraJson
         }
-
-        viewModelScope.launch {
-            providerConfigRepository.saveConfig(
-                providerId = state.selectedProviderId,
-                enabled = state.enabledDraft,
-                apiKeyPlainText = state.apiKeyDraft.takeIf { it.isNotBlank() },
-                baseUrl = state.baseUrlDraft,
-                model = state.modelDraft,
-                defaultVoice = state.voiceDraft,
-                extraJson = extraJson,
-            )
-            _uiState.update {
-                it.copy(
-                    apiKeyDraft = "",
-                    hasSavedApiKey = it.hasSavedApiKey || state.apiKeyDraft.isNotBlank(),
-                    savedMessage = "已保存",
-                )
-            }
-            AppLogger.i(TAG, "save complete provider=${state.selectedProviderId}")
-        }
-    }
 
     private fun ProviderSettingsUiState.withSelectedConfig(config: ProviderConfig): ProviderSettingsUiState {
         val customSettings = PhraseVoiceJson.decode(config.extraJson, CustomHttpSettings())
@@ -140,5 +217,6 @@ class ProviderSettingsViewModel(
 
     companion object {
         private const val TAG = "ProviderSettings"
+        private const val TEST_TEXT = "你好，这是 PhraseVoice 的语音试听。"
     }
 }
