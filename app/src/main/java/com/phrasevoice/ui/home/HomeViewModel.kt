@@ -520,7 +520,7 @@ class HomeViewModel(
     private fun edgeForwarderVoices(): List<TtsVoice> {
         val providerId = ProviderConfigRepository.EDGE_TTS_FORWARDER
         val configured = providerConfigs.firstOrNull { it.providerId == providerId }?.defaultVoice
-        val defaults = EdgeForwarderCatalog.voices.map { it.id to "${it.name} ${it.locale}" }
+        val defaults = EdgeForwarderCatalog.voices.map { it.id to it.name }
         val configuredVoice = configured
             ?.takeIf { it.isNotBlank() }
             ?.takeUnless { voice -> defaults.any { it.first == voice } }
