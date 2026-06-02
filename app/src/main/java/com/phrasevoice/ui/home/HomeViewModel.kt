@@ -188,7 +188,7 @@ class HomeViewModel(
                 errorMessage = when {
                     androidUnavailable -> it.androidTtsMessage
                     option.enabled -> null
-                    providerId == ProviderConfigRepository.MIMO -> "MiMo TTS 已加入计划，后续会按小米 MiMo V2.5 TTS 文档接入。"
+                    providerId == ProviderConfigRepository.MIMO -> "MiMo TTS 已加入计划，后续会接入预置音色和 VoiceDesign 角色声音。"
                     else -> "${option.name} 尚未启用，请先在 Provider 页面保存配置。"
                 },
             )
@@ -397,7 +397,7 @@ class HomeViewModel(
             }
 
             ProviderConfigRepository.GEMINI -> TtsResult.Error("Gemini TTS 会在后续版本接入，请先使用 Custom HTTP。")
-            ProviderConfigRepository.MIMO -> TtsResult.Error("MiMo TTS 已加入计划，后续会按小米 MiMo V2.5 TTS 文档接入。")
+            ProviderConfigRepository.MIMO -> TtsResult.Error("MiMo TTS 已加入计划，后续会接入预置音色和 VoiceDesign 角色声音。")
             else -> TtsResult.Error("未知 Provider：${request.providerId}")
         }
     }
@@ -439,7 +439,7 @@ class HomeViewModel(
                 providerId == ProviderConfigRepository.ANDROID_SYSTEM && !androidTtsReady ->
                     androidTtsMessage ?: "系统 TTS 不可用"
                 providerId == ProviderConfigRepository.GEMINI -> "后续接入"
-                providerId == ProviderConfigRepository.MIMO -> "计划接入"
+                providerId == ProviderConfigRepository.MIMO -> "角色声音计划"
                 !enabled -> "未启用"
                 else -> null
             },

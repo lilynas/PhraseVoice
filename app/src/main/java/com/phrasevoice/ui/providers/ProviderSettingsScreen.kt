@@ -117,7 +117,7 @@ fun ProviderSettingsScreen(
                     }
 
                     ProviderConfigRepository.MIMO -> {
-                        Text("MiMo TTS 已加入计划。后续会按小米 MiMo V2.5 TTS 文档接入 chat/completions 格式、预置音色、风格指令和 base64 音频解析。")
+                        Text("MiMo TTS 已加入计划。后续会接入预置音色和 VoiceDesign 角色声音：用文本描述生成专属角色音色，试听后保存为本地角色声音预设。")
                     }
 
                     else -> {
@@ -206,7 +206,7 @@ private fun ProviderSummaryCard(
                 Text(
                     text = when {
                         config.providerId == ProviderConfigRepository.GEMINI -> "后续接入"
-                        config.providerId == ProviderConfigRepository.MIMO -> "计划接入"
+                        config.providerId == ProviderConfigRepository.MIMO -> "角色声音计划"
                         config.enabled -> "已启用"
                         else -> "未启用"
                     },

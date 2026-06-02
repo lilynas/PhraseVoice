@@ -138,7 +138,7 @@ class SettingsViewModel(
             enabled = config.enabled,
             note = when {
                 config.providerId == ProviderConfigRepository.GEMINI -> "后续接入"
-                config.providerId == ProviderConfigRepository.MIMO -> "计划接入"
+                config.providerId == ProviderConfigRepository.MIMO -> "角色声音计划"
                 !config.enabled -> "未启用"
                 else -> null
             },

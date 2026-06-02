@@ -15,6 +15,7 @@
 - Implement `OpenAiTtsProvider` with `gpt-4o-mini-tts` as the default model.
 - Implement `GeminiTtsProvider` with isolated response parsing.
 - Implement `MiMoTtsProvider` for Xiaomi MiMo V2.5 TTS using the official chat completions speech synthesis API.
+- Add MiMo VoiceDesign character voices so users can create, preview, and reuse custom role voices from text descriptions.
 - Implement `CustomHttpTtsProvider` for OpenAI-compatible services, user-managed Edge TTS servers, and other TTS endpoints.
 - Add secure provider settings for API keys, base URLs, headers, models, voices, and request templates.
 
@@ -26,6 +27,15 @@
 - Default voice: `mimo_default`, with built-in choices such as `冰糖`, `茉莉`, `苏打`, `白桦`, `Mia`, `Chloe`, `Milo`, and `Dean`.
 - Request shape: place style/control instructions in the `user` message when present, place the target text in the `assistant` message, and set `audio.format` / `audio.voice`.
 - Response parsing: decode the base64 audio payload from the returned message audio data into a local audio file.
+
+### MiMo VoiceDesign Plan
+
+- Add a separate character voice design mode for `mimo-v2.5-tts-voicedesign` rather than treating it as another preset voice ID.
+- Voice description input: collect role/persona, age/gender, timbre, emotion, rhythm, accent/dialect, and optional scene notes as a reusable local preset.
+- Request shape: place the voice design description in the required `user` message and the preview/synthesis text in the `assistant` message.
+- Preview flow: synthesize a short sample, allow retrying the same description, then save the character voice preset for later phrase reading.
+- Optional text preview: support MiMo's `audio.optimize_text_preview` flag so the preview text can be improved for the designed voice when the user opts in.
+- Initial scope excludes voice cloning uploads; VoiceClone can be added later after privacy, file-size, and consent UX are designed.
 
 ## Phase 3 Polish
 
