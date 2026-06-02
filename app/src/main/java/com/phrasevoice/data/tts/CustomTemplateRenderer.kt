@@ -8,6 +8,6 @@ class CustomTemplateRenderer {
         }
 
     companion object {
-        private val VARIABLE_PATTERN = Regex("\\{\\{\\s*([A-Za-z0-9_]+)\\s*}}")
+        private val VARIABLE_PATTERN = Regex("\\{\\{\\s*([A-Za-z0-9_]+)\\s*\\}\\}")
     }
 }
