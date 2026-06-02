@@ -24,6 +24,12 @@ data class AndroidTtsEngine(
     val label: String,
 )
 
+data class AndroidTtsReadiness(
+    val ready: Boolean,
+    val message: String? = null,
+    val engines: List<AndroidTtsEngine> = emptyList(),
+)
+
 class AndroidSystemTtsProvider(
     context: Context,
 ) : TtsProvider {
@@ -65,8 +71,8 @@ class AndroidSystemTtsProvider(
         )
     }
 
-    override suspend fun listVoices(): List<TtsVoice> = withContext(Dispatchers.Default) {
-        if (!awaitReady()) return@withContext defaultVoice()
+    override suspend fun listVoices(): List<TtsVoice> = withContext(Dispatchers.Main) {
+        if (!readiness().ready) return@withContext defaultVoice()
 
         val voices = textToSpeech.voices.orEmpty()
         if (voices.isEmpty()) return@withContext defaultVoice()
@@ -93,9 +99,35 @@ class AndroidSystemTtsProvider(
             AndroidTtsEngine(name = engine.name, label = engine.label)
         }
 
+    suspend fun readiness(): AndroidTtsReadiness = withContext(Dispatchers.Main) {
+        val engines = listEngines()
+        if (engines.isEmpty()) {
+            return@withContext AndroidTtsReadiness(
+                ready = false,
+                message = "当前设备没有可用的 Android 系统 TTS 引擎。请安装或启用系统语音合成服务，或切换到 OpenAI/Custom HTTP。",
+                engines = engines,
+            )
+        }
+
+        when (val status = withTimeoutOrNull(INIT_TIMEOUT_MS) { initStatus.await() }) {
+            TextToSpeech.SUCCESS -> AndroidTtsReadiness(ready = true, engines = engines)
+            null -> AndroidTtsReadiness(
+                ready = false,
+                message = "Android 系统 TTS 初始化超时。请检查系统语音服务是否可用，或切换到 OpenAI/Custom HTTP。",
+                engines = engines,
+            )
+            else -> AndroidTtsReadiness(
+                ready = false,
+                message = "Android 系统 TTS 初始化失败（状态 $status）。请检查系统语音服务是否可用，或切换到 OpenAI/Custom HTTP。",
+                engines = engines,
+            )
+        }
+    }
+
     override suspend fun synthesize(request: TtsRequest): TtsResult = withContext(Dispatchers.Main) {
-        if (!awaitReady()) {
-            return@withContext TtsResult.Error("Android TextToSpeech is not ready.")
+        val readiness = readiness()
+        if (!readiness.ready) {
+            return@withContext TtsResult.Error(readiness.message ?: "Android 系统 TTS 暂不可用。")
         }
 
         applyRequestOptions(request)
@@ -120,8 +152,9 @@ class AndroidSystemTtsProvider(
         uri: Uri,
         mimeType: String,
     ): TtsResult = withContext(Dispatchers.Main) {
-        if (!awaitReady()) {
-            return@withContext TtsResult.Error("Android TextToSpeech is not ready.")
+        val readiness = readiness()
+        if (!readiness.ready) {
+            return@withContext TtsResult.Error(readiness.message ?: "Android 系统 TTS 暂不可用。")
         }
         if (request.outputFormat != AudioFormat.WAV) {
             return@withContext TtsResult.Error("Android System TTS currently exports WAV audio.")
@@ -154,11 +187,6 @@ class AndroidSystemTtsProvider(
 
     override fun stop() {
         textToSpeech.stop()
-    }
-
-    private suspend fun awaitReady(): Boolean {
-        val status = withTimeoutOrNull(INIT_TIMEOUT_MS) { initStatus.await() }
-        return status == TextToSpeech.SUCCESS
     }
 
     private fun applyRequestOptions(request: TtsRequest) {

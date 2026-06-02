@@ -58,6 +58,11 @@ fun HomeScreen(
     onQuickPhraseClick: (Phrase) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val androidTtsUnavailable = state.selectedProviderId == "android_system" && !state.androidTtsReady
+    val canRunTts = state.status != HomeStatus.Loading &&
+        state.status != HomeStatus.Saving &&
+        !androidTtsUnavailable
+
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -95,7 +100,7 @@ fun HomeScreen(
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Button(
                 onClick = onSpeak,
-                enabled = state.status != HomeStatus.Loading && state.status != HomeStatus.Saving,
+                enabled = canRunTts,
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 Icon(Icons.Outlined.PlayArrow, contentDescription = null)
@@ -111,7 +116,7 @@ fun HomeScreen(
                 }
                 OutlinedButton(
                     onClick = onSaveAudio,
-                    enabled = state.status != HomeStatus.Loading && state.status != HomeStatus.Saving,
+                    enabled = canRunTts,
                     modifier = Modifier.weight(1f),
                 ) {
                     Icon(Icons.Outlined.Download, contentDescription = null)

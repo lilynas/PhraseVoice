@@ -50,6 +50,8 @@ data class HomeUiState(
     val errorMessage: String? = null,
     val quickPhrases: List<Phrase> = emptyList(),
     val lastAudioUri: String? = null,
+    val androidTtsReady: Boolean = true,
+    val androidTtsMessage: String? = null,
 )
 
 class HomeViewModel(
@@ -87,7 +89,12 @@ class HomeViewModel(
             providerConfigRepository.configs.collect { configs ->
                 providerConfigs = configs
                 _uiState.update { state ->
-                    val providers = configs.map { it.toProviderOption() }
+                    val providers = configs.map {
+                        it.toProviderOption(
+                            androidTtsReady = state.androidTtsReady,
+                            androidTtsMessage = state.androidTtsMessage,
+                        )
+                    }
                     val selectedProviderId = state.selectedProviderId
                         .takeIf { id -> configs.any { it.providerId == id } }
                         ?: ProviderConfigRepository.ANDROID_SYSTEM
@@ -114,6 +121,24 @@ class HomeViewModel(
             }
         }
         viewModelScope.launch {
+            val readiness = systemTtsProvider.readiness()
+            _uiState.update { state ->
+                val selectedAndroid = state.selectedProviderId == ProviderConfigRepository.ANDROID_SYSTEM
+                state.copy(
+                    androidTtsReady = readiness.ready,
+                    androidTtsMessage = readiness.message,
+                    providers = providerConfigs.map {
+                        it.toProviderOption(
+                            androidTtsReady = readiness.ready,
+                            androidTtsMessage = readiness.message,
+                        )
+                    },
+                    status = if (selectedAndroid && !readiness.ready) HomeStatus.Error else state.status,
+                    errorMessage = if (selectedAndroid && !readiness.ready) readiness.message else state.errorMessage,
+                )
+            }
+        }
+        viewModelScope.launch {
             phraseRepository.phrases.collect { phrases ->
                 val quick = phrases
                     .sortedWith(
@@ -135,12 +160,21 @@ class HomeViewModel(
         val option = uiState.value.providers.firstOrNull { it.id == providerId } ?: return
         val voices = voicesFor(providerId)
         _uiState.update {
+            val androidUnavailable = providerId == ProviderConfigRepository.ANDROID_SYSTEM && !it.androidTtsReady
             it.copy(
                 selectedProviderId = providerId,
                 voices = voices,
                 selectedVoiceId = voices.firstOrNull()?.id,
-                status = if (option.enabled) HomeStatus.Idle else HomeStatus.Error,
-                errorMessage = if (option.enabled) null else "${option.name} 尚未启用，请先在 Provider 页面保存配置。",
+                status = when {
+                    androidUnavailable -> HomeStatus.Error
+                    option.enabled -> HomeStatus.Idle
+                    else -> HomeStatus.Error
+                },
+                errorMessage = when {
+                    androidUnavailable -> it.androidTtsMessage
+                    option.enabled -> null
+                    else -> "${option.name} 尚未启用，请先在 Provider 页面保存配置。"
+                },
             )
         }
     }
@@ -327,7 +361,10 @@ class HomeViewModel(
         )
     }
 
-    private fun ProviderConfig.toProviderOption(): TtsProviderOption =
+    private fun ProviderConfig.toProviderOption(
+        androidTtsReady: Boolean = true,
+        androidTtsMessage: String? = null,
+    ): TtsProviderOption =
         TtsProviderOption(
             id = providerId,
             name = when (providerId) {
@@ -337,8 +374,14 @@ class HomeViewModel(
                 ProviderConfigRepository.CUSTOM_HTTP -> "Custom HTTP TTS"
                 else -> providerId
             },
-            enabled = enabled,
+            enabled = if (providerId == ProviderConfigRepository.ANDROID_SYSTEM) {
+                enabled && androidTtsReady
+            } else {
+                enabled
+            },
             note = when {
+                providerId == ProviderConfigRepository.ANDROID_SYSTEM && !androidTtsReady ->
+                    androidTtsMessage ?: "系统 TTS 不可用"
                 providerId == ProviderConfigRepository.GEMINI -> "后续接入"
                 !enabled -> "未启用"
                 else -> null
