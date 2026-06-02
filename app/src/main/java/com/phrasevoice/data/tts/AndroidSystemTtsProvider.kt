@@ -103,14 +103,6 @@ class AndroidSystemTtsProvider(
 
     suspend fun readiness(): AndroidTtsReadiness = withContext(Dispatchers.Main) {
         val engines = listEngines()
-        if (engines.isEmpty()) {
-            return@withContext AndroidTtsReadiness(
-                ready = false,
-                message = "当前设备没有可用的 Android 系统 TTS 引擎。请安装或启用系统语音合成服务，或切换到 OpenAI/Custom HTTP。",
-                engines = engines,
-            )
-        }
-
         when (val status = withTimeoutOrNull(INIT_TIMEOUT_MS) { initStatus.await() }) {
             TextToSpeech.SUCCESS -> {
                 AppLogger.i(TAG, "readiness ready engines=${engines.map { it.name }}")
