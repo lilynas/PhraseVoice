@@ -2,81 +2,325 @@ package com.phrasevoice.ui.providers
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Cloud
 import androidx.compose.material.icons.outlined.PhoneAndroid
+import androidx.compose.material.icons.outlined.Save
 import androidx.compose.material.icons.outlined.Tune
+import androidx.compose.material3.AssistChip
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.phrasevoice.data.model.CustomHttpResponseType
+import com.phrasevoice.data.model.ProviderConfig
+import com.phrasevoice.data.repository.ProviderConfigRepository
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProviderSettingsScreen(
+    state: ProviderSettingsUiState,
+    onProviderSelected: (String) -> Unit,
+    onEnabledChange: (Boolean) -> Unit,
+    onApiKeyChange: (String) -> Unit,
+    onBaseUrlChange: (String) -> Unit,
+    onModelChange: (String) -> Unit,
+    onVoiceChange: (String) -> Unit,
+    onMethodChange: (String) -> Unit,
+    onHeadersChange: (String) -> Unit,
+    onBodyChange: (String) -> Unit,
+    onResponseTypeChange: (CustomHttpResponseType) -> Unit,
+    onResponseFieldChange: (String) -> Unit,
+    onSave: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(
         modifier = modifier
             .fillMaxSize()
+            .verticalScroll(rememberScrollState())
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Text(
-            text = "Provider",
-            style = MaterialTheme.typography.headlineMedium,
-        )
-        ProviderCard(
-            title = "Android System TTS",
-            description = "系统内置语音引擎，支持直接朗读和 WAV 导出。",
-            enabled = true,
-            icon = { Icon(Icons.Outlined.PhoneAndroid, contentDescription = null) },
-        )
-        ProviderCard(
-            title = "OpenAI TTS",
-            description = "默认模型将使用 gpt-4o-mini-tts，第二阶段接入。",
-            enabled = false,
-            icon = { Icon(Icons.Outlined.Cloud, contentDescription = null) },
-        )
-        ProviderCard(
-            title = "Gemini TTS",
-            description = "保留模型名、voiceName 和风格提示入口，第二阶段接入。",
-            enabled = false,
-            icon = { Icon(Icons.Outlined.Cloud, contentDescription = null) },
-        )
-        ProviderCard(
-            title = "Custom HTTP",
-            description = "面向 MiMo、OpenAI-compatible、自建 Edge TTS Server 等配置化服务。",
-            enabled = false,
-            icon = { Icon(Icons.Outlined.Tune, contentDescription = null) },
-        )
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(
+                text = "Provider",
+                style = MaterialTheme.typography.headlineMedium,
+                modifier = Modifier.weight(1f),
+            )
+            state.savedMessage?.let {
+                AssistChip(onClick = {}, label = { Text(it) })
+            }
+        }
+
+        state.configs.forEach { config ->
+            ProviderSummaryCard(
+                config = config,
+                selected = config.providerId == state.selectedProviderId,
+                onClick = { onProviderSelected(config.providerId) },
+            )
+        }
+
+        Card(modifier = Modifier.fillMaxWidth()) {
+            Column(
+                modifier = Modifier.padding(12.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Row {
+                    Text(
+                        text = providerLabel(state.selectedProviderId),
+                        style = MaterialTheme.typography.titleLarge,
+                        modifier = Modifier.weight(1f),
+                    )
+                    Switch(
+                        checked = state.enabledDraft,
+                        onCheckedChange = onEnabledChange,
+                        enabled = state.selectedProviderId != ProviderConfigRepository.ANDROID_SYSTEM &&
+                            state.selectedProviderId != ProviderConfigRepository.GEMINI,
+                    )
+                }
+
+                when (state.selectedProviderId) {
+                    ProviderConfigRepository.ANDROID_SYSTEM -> {
+                        Text("系统 TTS 使用手机已安装的语音服务，无需 API Key。")
+                    }
+
+                    ProviderConfigRepository.GEMINI -> {
+                        Text("Gemini TTS 会在下一步接入。当前可先用 Custom HTTP 配置兼容服务。")
+                    }
+
+                    else -> {
+                        OutlinedTextField(
+                            value = state.apiKeyDraft,
+                            onValueChange = onApiKeyChange,
+                            label = { Text(if (state.hasSavedApiKey) "API Key（已保存，留空不改）" else "API Key") },
+                            singleLine = true,
+                            visualTransformation = PasswordVisualTransformation(),
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+
+                        OutlinedTextField(
+                            value = state.baseUrlDraft,
+                            onValueChange = onBaseUrlChange,
+                            label = { Text("Base URL") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+
+                        OutlinedTextField(
+                            value = state.modelDraft,
+                            onValueChange = onModelChange,
+                            label = { Text("模型") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+
+                        OutlinedTextField(
+                            value = state.voiceDraft,
+                            onValueChange = onVoiceChange,
+                            label = { Text("默认 Voice") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+
+                        if (state.isCustomHttp) {
+                            CustomHttpFields(
+                                state = state,
+                                onMethodChange = onMethodChange,
+                                onHeadersChange = onHeadersChange,
+                                onBodyChange = onBodyChange,
+                                onResponseTypeChange = onResponseTypeChange,
+                                onResponseFieldChange = onResponseFieldChange,
+                            )
+                        }
+
+                        Button(
+                            onClick = onSave,
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Icon(Icons.Outlined.Save, contentDescription = null)
+                            Text("保存配置")
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 
 @Composable
-private fun ProviderCard(
-    title: String,
-    description: String,
-    enabled: Boolean,
-    icon: @Composable () -> Unit,
+private fun ProviderSummaryCard(
+    config: ProviderConfig,
+    selected: Boolean,
+    onClick: () -> Unit,
 ) {
-    Card(modifier = Modifier.fillMaxWidth()) {
-        androidx.compose.foundation.layout.Row(
-            modifier = Modifier.padding(12.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            icon()
-            Column(modifier = Modifier.weight(1f)) {
-                Text(text = title, style = MaterialTheme.typography.titleMedium)
-                Text(text = description, style = MaterialTheme.typography.bodyMedium)
+    FilterChip(
+        selected = selected,
+        onClick = onClick,
+        label = {
+            Column {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    ProviderIcon(config.providerId)
+                    Text(providerLabel(config.providerId), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
+                Text(
+                    text = if (config.enabled) "已启用" else "未启用",
+                    style = MaterialTheme.typography.bodySmall,
+                )
             }
-            Switch(checked = enabled, onCheckedChange = null)
+        },
+        modifier = Modifier.fillMaxWidth(),
+    )
+}
+
+@Composable
+private fun ProviderIcon(providerId: String) {
+    val icon = when (providerId) {
+        ProviderConfigRepository.ANDROID_SYSTEM -> Icons.Outlined.PhoneAndroid
+        ProviderConfigRepository.CUSTOM_HTTP -> Icons.Outlined.Tune
+        else -> Icons.Outlined.Cloud
+    }
+    Icon(icon, contentDescription = null)
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun CustomHttpFields(
+    state: ProviderSettingsUiState,
+    onMethodChange: (String) -> Unit,
+    onHeadersChange: (String) -> Unit,
+    onBodyChange: (String) -> Unit,
+    onResponseTypeChange: (CustomHttpResponseType) -> Unit,
+    onResponseFieldChange: (String) -> Unit,
+) {
+    var methodExpanded by remember { mutableStateOf(false) }
+    var responseExpanded by remember { mutableStateOf(false) }
+
+    ExposedDropdownMenuBox(
+        expanded = methodExpanded,
+        onExpandedChange = { methodExpanded = !methodExpanded },
+    ) {
+        OutlinedTextField(
+            modifier = Modifier
+                .menuAnchor()
+                .fillMaxWidth(),
+            readOnly = true,
+            value = state.methodDraft,
+            onValueChange = {},
+            label = { Text("HTTP Method") },
+            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = methodExpanded) },
+        )
+        ExposedDropdownMenu(
+            expanded = methodExpanded,
+            onDismissRequest = { methodExpanded = false },
+        ) {
+            listOf("POST", "GET", "PUT").forEach { method ->
+                DropdownMenuItem(
+                    text = { Text(method) },
+                    onClick = {
+                        methodExpanded = false
+                        onMethodChange(method)
+                    },
+                )
+            }
         }
     }
+
+    OutlinedTextField(
+        value = state.headersDraft,
+        onValueChange = onHeadersChange,
+        label = { Text("Headers 模板") },
+        minLines = 3,
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = 104.dp),
+    )
+    OutlinedTextField(
+        value = state.bodyDraft,
+        onValueChange = onBodyChange,
+        label = { Text("JSON Body 模板") },
+        minLines = 5,
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = 144.dp),
+    )
+
+    ExposedDropdownMenuBox(
+        expanded = responseExpanded,
+        onExpandedChange = { responseExpanded = !responseExpanded },
+    ) {
+        OutlinedTextField(
+            modifier = Modifier
+                .menuAnchor()
+                .fillMaxWidth(),
+            readOnly = true,
+            value = responseTypeLabel(state.responseTypeDraft),
+            onValueChange = {},
+            label = { Text("Response 类型") },
+            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = responseExpanded) },
+        )
+        ExposedDropdownMenu(
+            expanded = responseExpanded,
+            onDismissRequest = { responseExpanded = false },
+        ) {
+            CustomHttpResponseType.entries.forEach { type ->
+                DropdownMenuItem(
+                    text = { Text(responseTypeLabel(type)) },
+                    onClick = {
+                        responseExpanded = false
+                        onResponseTypeChange(type)
+                    },
+                )
+            }
+        }
+    }
+
+    if (state.responseTypeDraft != CustomHttpResponseType.RAW_AUDIO) {
+        OutlinedTextField(
+            value = state.responseFieldDraft,
+            onValueChange = onResponseFieldChange,
+            label = { Text("JSON 字段路径") },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth(),
+        )
+    }
 }
+
+private fun providerLabel(providerId: String): String =
+    when (providerId) {
+        ProviderConfigRepository.ANDROID_SYSTEM -> "Android System TTS"
+        ProviderConfigRepository.OPENAI -> "OpenAI-compatible TTS"
+        ProviderConfigRepository.GEMINI -> "Gemini TTS"
+        ProviderConfigRepository.CUSTOM_HTTP -> "Custom HTTP TTS"
+        else -> providerId
+    }
+
+private fun responseTypeLabel(type: CustomHttpResponseType): String =
+    when (type) {
+        CustomHttpResponseType.RAW_AUDIO -> "Raw audio"
+        CustomHttpResponseType.JSON_BASE64_FIELD -> "JSON base64 field"
+        CustomHttpResponseType.JSON_URL_FIELD -> "JSON URL field"
+    }

@@ -8,8 +8,10 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Download
 import androidx.compose.material.icons.outlined.PlayArrow
@@ -26,6 +28,7 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -58,6 +61,7 @@ fun HomeScreen(
     Column(
         modifier = modifier
             .fillMaxSize()
+            .verticalScroll(rememberScrollState())
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
@@ -88,24 +92,31 @@ fun HomeScreen(
         SliderRow(label = "音调", value = state.pitch, range = 0.5f..2.0f, onChange = onPitchChange)
         SliderRow(label = "音量", value = state.volume, range = 0.0f..1.0f, onChange = onVolumeChange)
 
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Button(
                 onClick = onSpeak,
                 enabled = state.status != HomeStatus.Loading && state.status != HomeStatus.Saving,
+                modifier = Modifier.fillMaxWidth(),
             ) {
                 Icon(Icons.Outlined.PlayArrow, contentDescription = null)
-                Text("朗读")
+                Text(if (state.status == HomeStatus.Loading) "准备中" else "朗读")
             }
-            TextButton(onClick = onStop) {
-                Icon(Icons.Outlined.Stop, contentDescription = null)
-                Text("停止")
-            }
-            TextButton(
-                onClick = onSaveAudio,
-                enabled = state.status != HomeStatus.Loading && state.status != HomeStatus.Saving,
-            ) {
-                Icon(Icons.Outlined.Download, contentDescription = null)
-                Text("保存")
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(
+                    onClick = onStop,
+                    modifier = Modifier.weight(1f),
+                ) {
+                    Icon(Icons.Outlined.Stop, contentDescription = null)
+                    Text("停止")
+                }
+                OutlinedButton(
+                    onClick = onSaveAudio,
+                    enabled = state.status != HomeStatus.Loading && state.status != HomeStatus.Saving,
+                    modifier = Modifier.weight(1f),
+                ) {
+                    Icon(Icons.Outlined.Download, contentDescription = null)
+                    Text(if (state.status == HomeStatus.Saving) "保存中" else "保存")
+                }
             }
         }
 
@@ -161,7 +172,7 @@ private fun ProviderDropdown(
                 DropdownMenuItem(
                     text = {
                         Text(
-                            text = if (provider.enabled) provider.name else "${provider.name} · Phase 2",
+                            text = listOfNotNull(provider.name, provider.note).joinToString(" · "),
                         )
                     },
                     onClick = {
@@ -253,7 +264,7 @@ private fun StatusPanel(state: HomeUiState) {
         Column(modifier = Modifier.padding(12.dp)) {
             AssistChip(
                 onClick = {},
-                label = { Text(state.status.name) },
+                label = { Text(statusLabel(state.status)) },
             )
             if (!state.errorMessage.isNullOrBlank()) {
                 Spacer(modifier = Modifier.height(8.dp))
@@ -269,3 +280,12 @@ private fun StatusPanel(state: HomeUiState) {
         }
     }
 }
+
+private fun statusLabel(status: HomeStatus): String =
+    when (status) {
+        HomeStatus.Idle -> "空闲"
+        HomeStatus.Loading -> "准备中"
+        HomeStatus.Playing -> "播放中"
+        HomeStatus.Saving -> "保存中"
+        HomeStatus.Error -> "出错"
+    }

@@ -30,6 +30,7 @@ import com.phrasevoice.ui.home.HomeViewModel
 import com.phrasevoice.ui.library.PhraseLibraryScreen
 import com.phrasevoice.ui.library.PhraseLibraryViewModel
 import com.phrasevoice.ui.providers.ProviderSettingsScreen
+import com.phrasevoice.ui.providers.ProviderSettingsViewModel
 import com.phrasevoice.ui.settings.SettingsScreen
 import com.phrasevoice.ui.settings.SettingsViewModel
 
@@ -51,6 +52,7 @@ fun PhraseVoiceRoot(container: AppContainer) {
     val libraryViewModel: PhraseLibraryViewModel = viewModel(factory = factory)
     val historyViewModel: HistoryViewModel = viewModel(factory = factory)
     val settingsViewModel: SettingsViewModel = viewModel(factory = factory)
+    val providerSettingsViewModel: ProviderSettingsViewModel = viewModel(factory = factory)
 
     var destination by rememberSaveable { mutableStateOf(Destination.Home) }
 
@@ -114,7 +116,22 @@ fun PhraseVoiceRoot(container: AppContainer) {
                 modifier = modifier,
             )
 
-            Destination.Providers -> ProviderSettingsScreen(modifier = modifier)
+            Destination.Providers -> ProviderSettingsScreen(
+                state = providerSettingsViewModel.uiState.collectAsStateWithLifecycle().value,
+                onProviderSelected = providerSettingsViewModel::selectProvider,
+                onEnabledChange = providerSettingsViewModel::updateEnabled,
+                onApiKeyChange = providerSettingsViewModel::updateApiKeyDraft,
+                onBaseUrlChange = providerSettingsViewModel::updateBaseUrlDraft,
+                onModelChange = providerSettingsViewModel::updateModelDraft,
+                onVoiceChange = providerSettingsViewModel::updateVoiceDraft,
+                onMethodChange = providerSettingsViewModel::updateMethodDraft,
+                onHeadersChange = providerSettingsViewModel::updateHeadersDraft,
+                onBodyChange = providerSettingsViewModel::updateBodyDraft,
+                onResponseTypeChange = providerSettingsViewModel::updateResponseTypeDraft,
+                onResponseFieldChange = providerSettingsViewModel::updateResponseFieldDraft,
+                onSave = providerSettingsViewModel::save,
+                modifier = modifier,
+            )
 
             Destination.Settings -> SettingsScreen(
                 state = settingsViewModel.uiState.collectAsStateWithLifecycle().value,

@@ -5,6 +5,7 @@ captures/
 .externalNativeBuild/
 .cxx/
 .codex_git/
+.codex-remote-attachments/
 
 # Android Studio / IntelliJ
 *.iml

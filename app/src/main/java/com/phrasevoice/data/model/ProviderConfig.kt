@@ -13,3 +13,21 @@ data class ProviderConfig(
     val defaultVoice: String? = null,
     val extraJson: String? = null,
 )
+
+@Serializable
+data class CustomHttpSettings(
+    val method: String = "POST",
+    val headersTemplate: String = "Authorization: Bearer {{apiKey}}\nContent-Type: application/json",
+    val bodyTemplate: String = """
+        {"input":"{{text}}","voice":"{{voice}}","speed":{{speed}},"format":"{{format}}"}
+    """.trimIndent(),
+    val responseType: CustomHttpResponseType = CustomHttpResponseType.RAW_AUDIO,
+    val responseField: String = "audio",
+)
+
+@Serializable
+enum class CustomHttpResponseType {
+    RAW_AUDIO,
+    JSON_BASE64_FIELD,
+    JSON_URL_FIELD,
+}

@@ -6,6 +6,7 @@ import com.phrasevoice.di.AppContainer
 import com.phrasevoice.ui.history.HistoryViewModel
 import com.phrasevoice.ui.home.HomeViewModel
 import com.phrasevoice.ui.library.PhraseLibraryViewModel
+import com.phrasevoice.ui.providers.ProviderSettingsViewModel
 import com.phrasevoice.ui.settings.SettingsViewModel
 
 class AppViewModelFactory(
@@ -18,7 +19,10 @@ class AppViewModelFactory(
                 phraseRepository = container.phraseRepository,
                 historyRepository = container.historyRepository,
                 settingsRepository = container.settingsRepository,
+                providerConfigRepository = container.providerConfigRepository,
                 systemTtsProvider = container.systemTtsProvider,
+                cloudTtsService = container.cloudTtsService,
+                audioPlaybackController = container.audioPlaybackController,
                 audioFileStore = container.audioFileStore,
             )
 
@@ -33,6 +37,10 @@ class AppViewModelFactory(
 
             modelClass.isAssignableFrom(SettingsViewModel::class.java) -> SettingsViewModel(
                 settingsRepository = container.settingsRepository,
+            )
+
+            modelClass.isAssignableFrom(ProviderSettingsViewModel::class.java) -> ProviderSettingsViewModel(
+                providerConfigRepository = container.providerConfigRepository,
             )
 
             else -> error("Unknown ViewModel class: ${modelClass.name}")
