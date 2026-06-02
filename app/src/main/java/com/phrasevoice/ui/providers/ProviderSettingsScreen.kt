@@ -42,6 +42,7 @@ import com.phrasevoice.data.model.CustomHttpResponseType
 import com.phrasevoice.data.model.ProviderConfig
 import com.phrasevoice.data.repository.ProviderConfigRepository
 import com.phrasevoice.data.tts.EdgeForwarderCatalog
+import com.phrasevoice.data.tts.GeminiTtsCatalog
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -103,7 +104,6 @@ fun ProviderSettingsScreen(
                         checked = state.enabledDraft,
                         onCheckedChange = onEnabledChange,
                         enabled = state.selectedProviderId != ProviderConfigRepository.ANDROID_SYSTEM &&
-                            state.selectedProviderId != ProviderConfigRepository.GEMINI &&
                             state.selectedProviderId != ProviderConfigRepository.MIMO,
                     )
                 }
@@ -111,10 +111,6 @@ fun ProviderSettingsScreen(
                 when (state.selectedProviderId) {
                     ProviderConfigRepository.ANDROID_SYSTEM -> {
                         Text("系统 TTS 使用手机已安装的语音服务，无需 API Key。")
-                    }
-
-                    ProviderConfigRepository.GEMINI -> {
-                        Text("Gemini TTS 会在下一步接入。当前可先用 Custom HTTP 配置兼容服务。")
                     }
 
                     ProviderConfigRepository.MIMO -> {
@@ -144,10 +140,22 @@ fun ProviderSettingsScreen(
                             Text("使用 ms-ra-forwarder 的 /api/text-to-speech 接口。Base URL 可填站点根地址或完整接口地址；如果实例启用了 TOKEN，这里填 Token。")
                         }
 
+                        if (state.isGemini) {
+                            Text("使用 Gemini generateContent TTS 接口。Gemini 返回 PCM 音频，App 会自动封装为 WAV。")
+                        }
+
                         OutlinedTextField(
                             value = state.baseUrlDraft,
                             onValueChange = onBaseUrlChange,
-                            label = { Text(if (state.isEdgeForwarder) "Forwarder URL" else "Base URL") },
+                            label = {
+                                Text(
+                                    when {
+                                        state.isEdgeForwarder -> "Forwarder URL"
+                                        state.isGemini -> "Gemini Base URL"
+                                        else -> "Base URL"
+                                    },
+                                )
+                            },
                             singleLine = true,
                             modifier = Modifier.fillMaxWidth(),
                         )
@@ -164,6 +172,11 @@ fun ProviderSettingsScreen(
 
                         if (state.isEdgeForwarder) {
                             EdgeForwarderVoiceDropdown(
+                                voiceDraft = state.voiceDraft,
+                                onVoiceChange = onVoiceChange,
+                            )
+                        } else if (state.isGemini) {
+                            GeminiVoiceDropdown(
                                 voiceDraft = state.voiceDraft,
                                 onVoiceChange = onVoiceChange,
                             )
@@ -228,7 +241,6 @@ private fun ProviderSummaryCard(
                 }
                 Text(
                     text = when {
-                        config.providerId == ProviderConfigRepository.GEMINI -> "后续接入"
                         config.providerId == ProviderConfigRepository.MIMO -> "角色声音计划"
                         config.enabled -> "已启用"
                         else -> "未启用"
@@ -289,6 +301,55 @@ private fun EdgeForwarderVoiceDropdown(
                         Column {
                             Text(voice.name, maxLines = 1, overflow = TextOverflow.Ellipsis)
                             Text(voice.locale, style = MaterialTheme.typography.bodySmall)
+                        }
+                    },
+                    onClick = {
+                        expanded = false
+                        onVoiceChange(voice.id)
+                    },
+                )
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun GeminiVoiceDropdown(
+    voiceDraft: String,
+    onVoiceChange: (String) -> Unit,
+) {
+    var expanded by remember { mutableStateOf(false) }
+    val knownVoices = GeminiTtsCatalog.voices
+    val selectedName = knownVoices
+        .firstOrNull { it.id == voiceDraft }
+        ?.let { "${it.id} - ${it.tone}" }
+        ?: voiceDraft
+
+    ExposedDropdownMenuBox(
+        expanded = expanded,
+        onExpandedChange = { expanded = !expanded },
+    ) {
+        OutlinedTextField(
+            modifier = Modifier
+                .menuAnchor()
+                .fillMaxWidth(),
+            readOnly = true,
+            value = selectedName,
+            onValueChange = {},
+            label = { Text("默认 Voice") },
+            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+        )
+        ExposedDropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false },
+        ) {
+            knownVoices.forEach { voice ->
+                DropdownMenuItem(
+                    text = {
+                        Column {
+                            Text(voice.id, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Text(voice.tone, style = MaterialTheme.typography.bodySmall)
                         }
                     },
                     onClick = {

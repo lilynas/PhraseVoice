@@ -10,6 +10,7 @@ import com.phrasevoice.data.model.CustomHttpSettings
 import com.phrasevoice.data.model.ProviderConfig
 import com.phrasevoice.data.security.ApiKeyCipher
 import com.phrasevoice.data.tts.EdgeForwarderCatalog
+import com.phrasevoice.data.tts.GeminiTtsCatalog
 import com.phrasevoice.debug.AppLogger
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
@@ -134,8 +135,9 @@ class ProviderConfigRepository(
                 ProviderConfig(
                     providerId = GEMINI,
                     enabled = false,
-                    model = "gemini-2.5-flash-preview-tts",
-                    defaultVoice = "Kore",
+                    baseUrl = "https://generativelanguage.googleapis.com/v1beta/models",
+                    model = "gemini-3.1-flash-tts-preview",
+                    defaultVoice = GeminiTtsCatalog.DEFAULT_VOICE_ID,
                 ),
                 ProviderConfig(
                     providerId = MIMO,

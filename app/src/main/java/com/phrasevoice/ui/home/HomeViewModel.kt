@@ -14,6 +14,7 @@ import com.phrasevoice.data.tts.AndroidSystemTtsProvider
 import com.phrasevoice.data.tts.CloudTtsService
 import com.phrasevoice.data.tts.EdgeForwarderCatalog
 import com.phrasevoice.data.tts.EdgeForwarderStyle
+import com.phrasevoice.data.tts.GeminiTtsCatalog
 import com.phrasevoice.debug.AppLogger
 import com.phrasevoice.domain.model.AudioFormat
 import com.phrasevoice.domain.tts.TtsRequest
@@ -264,7 +265,7 @@ class HomeViewModel(
 
         viewModelScope.launch {
             _uiState.update { it.copy(status = HomeStatus.Loading, errorMessage = null) }
-            val request = currentRequest(text = trimmed, outputFormat = AudioFormat.MP3)
+            val request = currentRequest(text = trimmed, outputFormat = outputFormatForSelectedProvider())
             AppLogger.i(
                 TAG,
                 "speak start provider=${request.providerId} voice=${request.voiceId.orEmpty()} length=${trimmed.length}",
@@ -330,11 +331,7 @@ class HomeViewModel(
 
         viewModelScope.launch {
             _uiState.update { it.copy(status = HomeStatus.Saving, errorMessage = null) }
-            val outputFormat = if (uiState.value.selectedProviderId == ProviderConfigRepository.ANDROID_SYSTEM) {
-                AudioFormat.WAV
-            } else {
-                AudioFormat.MP3
-            }
+            val outputFormat = outputFormatForSelectedProvider()
             val request = currentRequest(text = trimmed, outputFormat = outputFormat)
             AppLogger.i(
                 TAG,
@@ -403,6 +400,7 @@ class HomeViewModel(
 
             ProviderConfigRepository.OPENAI,
             ProviderConfigRepository.EDGE_TTS_FORWARDER,
+            ProviderConfigRepository.GEMINI,
             ProviderConfigRepository.CUSTOM_HTTP -> {
                 val settings = settingsRepository.currentSettings()
                 if (playAudioFile && !settings.keepAudioCache) {
@@ -421,11 +419,17 @@ class HomeViewModel(
                 result
             }
 
-            ProviderConfigRepository.GEMINI -> TtsResult.Error("Gemini TTS 会在后续版本接入，请先使用 Custom HTTP。")
             ProviderConfigRepository.MIMO -> TtsResult.Error("MiMo TTS 已加入计划，后续会接入预置音色和 VoiceDesign 角色声音。")
             else -> TtsResult.Error("未知 Provider：${request.providerId}")
         }
     }
+
+    private fun outputFormatForSelectedProvider(): AudioFormat =
+        when (uiState.value.selectedProviderId) {
+            ProviderConfigRepository.ANDROID_SYSTEM,
+            ProviderConfigRepository.GEMINI -> AudioFormat.WAV
+            else -> AudioFormat.MP3
+        }
 
     private fun currentRequest(text: String, outputFormat: AudioFormat): TtsRequest {
         val state = uiState.value
@@ -467,7 +471,6 @@ class HomeViewModel(
             note = when {
                 providerId == ProviderConfigRepository.ANDROID_SYSTEM && !androidTtsReady ->
                     androidTtsMessage ?: "系统 TTS 不可用"
-                providerId == ProviderConfigRepository.GEMINI -> "后续接入"
                 providerId == ProviderConfigRepository.MIMO -> "角色声音计划"
                 !enabled -> "未启用"
                 else -> null
@@ -489,6 +492,7 @@ class HomeViewModel(
 
             ProviderConfigRepository.OPENAI -> openAiVoices()
             ProviderConfigRepository.EDGE_TTS_FORWARDER -> edgeForwarderVoices()
+            ProviderConfigRepository.GEMINI -> geminiVoices()
             ProviderConfigRepository.MIMO -> mimoVoices()
             ProviderConfigRepository.CUSTOM_HTTP -> {
                 val voice = providerConfigs
@@ -547,6 +551,26 @@ class HomeViewModel(
                 TtsVoice(
                     id = voice,
                     name = voice,
+                    language = null,
+                    providerId = providerId,
+                )
+            }
+    }
+
+    private fun geminiVoices(): List<TtsVoice> {
+        val providerId = ProviderConfigRepository.GEMINI
+        val configured = providerConfigs.firstOrNull { it.providerId == providerId }?.defaultVoice
+        val defaults = GeminiTtsCatalog.voices.map { it.id to "${it.id} - ${it.tone}" }
+        val configuredVoice = configured
+            ?.takeIf { it.isNotBlank() }
+            ?.takeUnless { voice -> defaults.any { it.first == voice } }
+            ?.let { it to it }
+        return (listOfNotNull(configuredVoice) + defaults)
+            .distinctBy { it.first }
+            .map { (voice, name) ->
+                TtsVoice(
+                    id = voice,
+                    name = name,
                     language = null,
                     providerId = providerId,
                 )

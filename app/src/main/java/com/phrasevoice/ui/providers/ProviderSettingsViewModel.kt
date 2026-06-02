@@ -43,6 +43,9 @@ data class ProviderSettingsUiState(
 
     val isEdgeForwarder: Boolean
         get() = selectedProviderId == ProviderConfigRepository.EDGE_TTS_FORWARDER
+
+    val isGemini: Boolean
+        get() = selectedProviderId == ProviderConfigRepository.GEMINI
 }
 
 class ProviderSettingsViewModel(
@@ -115,6 +118,7 @@ class ProviderSettingsViewModel(
         val state = uiState.value
         if (state.selectedProviderId != ProviderConfigRepository.OPENAI &&
             state.selectedProviderId != ProviderConfigRepository.EDGE_TTS_FORWARDER &&
+            state.selectedProviderId != ProviderConfigRepository.GEMINI &&
             state.selectedProviderId != ProviderConfigRepository.CUSTOM_HTTP
         ) {
             _uiState.update { it.copy(savedMessage = "当前 Provider 不需要云端试听") }
@@ -135,7 +139,7 @@ class ProviderSettingsViewModel(
                     pitch = 1.0f,
                     volume = 1.0f,
                     stylePrompt = "自然、清晰、适合日常交流",
-                    outputFormat = AudioFormat.MP3,
+                    outputFormat = if (state.isGemini) AudioFormat.WAV else AudioFormat.MP3,
                 )
                 when (val result = cloudTtsService.synthesize(request, runtimeConfig, cache = true)) {
                     is TtsResult.AudioFile -> {

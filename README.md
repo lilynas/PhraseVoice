@@ -13,9 +13,10 @@ Phase 1 MVP is in progress:
 - Audio export through Android system TTS as WAV
 - Provider abstraction ready for cloud providers
 - Edge TTS Forwarder provider for user-managed `ms-ra-forwarder` instances, with voice and style dropdowns
+- Gemini TTS provider through Google `generateContent`, with preset voice dropdowns and WAV output wrapping
 - GitHub Actions CI for build and unit test verification
 
-Phase 2 will continue with Gemini TTS, Xiaomi MiMo V2.5 TTS with VoiceDesign character voices, and broader Custom HTTP presets.
+Phase 2 will continue with Xiaomi MiMo V2.5 TTS with VoiceDesign character voices, phrase import/export, and broader Custom HTTP presets.
 
 ## Build Verification
 
@@ -32,6 +33,7 @@ The workflow installs JDK 17, Android SDK 35, and Gradle 8.7.
 - Do not commit API keys, tokens, `.env` files, keystores, or provider secrets.
 - Network request logging must stay disabled or redacted before cloud providers are enabled.
 - Users are responsible for third-party API costs.
+- Gemini TTS uses the Google AI `generateContent` speech endpoint and stores the API key only through the app's provider configuration.
 - MiMo TTS will follow Xiaomi MiMo's official V2.5 speech synthesis API and store API keys only through the app's provider configuration.
 - MiMo VoiceDesign character voice presets should store only user-authored voice descriptions and generated audio metadata locally, not provider secrets or raw debug payloads.
 - Edge TTS Forwarder is intended for user-managed `ms-ra-forwarder` deployments. If the deployment requires `TOKEN`, save it in the provider's Token field. Non-official services may have stability and compliance risks.

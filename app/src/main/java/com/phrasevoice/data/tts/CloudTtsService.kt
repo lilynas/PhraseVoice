@@ -15,6 +15,7 @@ import java.util.Base64
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
@@ -46,6 +47,7 @@ class CloudTtsService(
         when (runtimeConfig.config.providerId) {
             ProviderConfigRepository.OPENAI -> synthesizeOpenAiCompatible(request, runtimeConfig, cache)
             ProviderConfigRepository.EDGE_TTS_FORWARDER -> synthesizeEdgeTtsForwarder(request, runtimeConfig, cache)
+            ProviderConfigRepository.GEMINI -> synthesizeGeminiTts(request, runtimeConfig, cache)
             ProviderConfigRepository.CUSTOM_HTTP -> synthesizeCustomHttp(request, runtimeConfig, cache)
             else -> TtsResult.Error("该 Provider 暂未接入。")
         }
@@ -117,6 +119,70 @@ class CloudTtsService(
             ?.let { token -> builder.addHeader("Authorization", "Bearer $token") }
 
         return executeAudioRequest(builder.build(), target.file, target.uri, target.mimeType)
+    }
+
+    private fun synthesizeGeminiTts(
+        request: TtsRequest,
+        runtimeConfig: RuntimeProviderConfig,
+        cache: Boolean,
+    ): TtsResult {
+        val apiKey = runtimeConfig.apiKey
+        if (apiKey.isNullOrBlank()) return TtsResult.Error("请先在 Provider 页面保存 Gemini API Key。")
+        val config = runtimeConfig.config
+        val model = config.model?.takeIf { it.isNotBlank() } ?: "gemini-3.1-flash-tts-preview"
+        val baseUrl = config.baseUrl?.takeIf { it.isNotBlank() }
+            ?: return TtsResult.Error("请先配置 Gemini Base URL。")
+        val endpoint = geminiGenerateContentEndpoint(baseUrl, model)
+            ?: return TtsResult.Error("Gemini Base URL 无效。")
+        val voice = request.voiceId ?: config.defaultVoice ?: GeminiTtsCatalog.DEFAULT_VOICE_ID
+        val target = audioFileStore.createTarget(AudioFormat.WAV, cache = cache)
+        val prompt = request.stylePrompt
+            ?.takeIf { it.isNotBlank() }
+            ?.let { "朗读下面文字。风格要求：$it\n\n${request.text}" }
+            ?: request.text
+        val body = JsonObject(
+            mapOf(
+                "contents" to JsonArray(
+                    listOf(
+                        JsonObject(
+                            mapOf(
+                                "parts" to JsonArray(
+                                    listOf(
+                                        JsonObject(mapOf("text" to JsonPrimitive(prompt))),
+                                    ),
+                                ),
+                            ),
+                        ),
+                    ),
+                ),
+                "generationConfig" to JsonObject(
+                    mapOf(
+                        "responseModalities" to JsonArray(listOf(JsonPrimitive("AUDIO"))),
+                        "speechConfig" to JsonObject(
+                            mapOf(
+                                "voiceConfig" to JsonObject(
+                                    mapOf(
+                                        "prebuiltVoiceConfig" to JsonObject(
+                                            mapOf("voiceName" to JsonPrimitive(voice)),
+                                        ),
+                                    ),
+                                ),
+                            ),
+                        ),
+                    ),
+                ),
+                "model" to JsonPrimitive(model),
+            ),
+        ).toString()
+        AppLogger.i(TAG, "gemini request url=${endpoint.toString().safeUrlForLog()} voice=$voice")
+        val httpRequest = Request.Builder()
+            .url(endpoint)
+            .addHeader("x-goog-api-key", apiKey)
+            .addHeader("Content-Type", "application/json")
+            .post(body.toRequestBody(JSON_MEDIA_TYPE))
+            .build()
+
+        return executeGeminiAudioRequest(httpRequest, target.file, target.uri, target.mimeType)
     }
 
     private fun synthesizeCustomHttp(
@@ -256,6 +322,30 @@ class CloudTtsService(
             TtsResult.Error("下载音频失败：${throwable.message ?: "未知错误"}", throwable)
         }
 
+    private fun executeGeminiAudioRequest(
+        request: Request,
+        file: File,
+        uri: Uri,
+        mimeType: String,
+    ): TtsResult =
+        runCatching {
+            httpClient.newCall(request).execute().use { response ->
+                AppLogger.i(TAG, "gemini response code=${response.code} url=${request.url.toString().safeUrlForLog()}")
+                if (!response.isSuccessful) return response.toTtsError()
+                val json = response.body?.string() ?: return TtsResult.Error("Gemini 没有返回 JSON。")
+                val audio = GeminiTtsResponseParser.parseAudio(json)
+                PcmWavWriter.writeWav(file, audio.pcmBytes)
+                AppLogger.i(
+                    TAG,
+                    "gemini wav saved bytes=${file.length()} sourceMime=${audio.sourceMimeType.orEmpty()} uri=$uri",
+                )
+                TtsResult.AudioFile(uri = uri, mimeType = mimeType)
+            }
+        }.getOrElse { throwable ->
+            AppLogger.e(TAG, "gemini request failed url=${request.url.toString().safeUrlForLog()}", throwable)
+            TtsResult.Error("解析 Gemini 音频响应失败：${throwable.message ?: "未知错误"}", throwable)
+        }
+
     private fun findJsonString(json: String, path: String): String? {
         var current: JsonElement = kotlinx.serialization.json.Json.parseToJsonElement(json)
         path.split(".").filter { it.isNotBlank() }.forEach { key ->
@@ -276,6 +366,21 @@ class CloudTtsService(
             "$rootPath/api/text-to-speech"
         }
         return parsed.newBuilder().encodedPath(apiPath).build()
+    }
+
+    private fun geminiGenerateContentEndpoint(baseUrl: String, model: String): HttpUrl? {
+        val parsed = baseUrl.trim().toHttpUrlOrNull() ?: return null
+        val cleanModel = model.trim().trim('/')
+        if (cleanModel.isBlank()) return null
+        val currentPath = parsed.encodedPath.trimEnd('/')
+        val generatePath = when {
+            currentPath.endsWith(":generateContent") -> currentPath
+            currentPath.contains("/models/") -> "$currentPath:generateContent"
+            currentPath.endsWith("/models") -> "$currentPath/$cleanModel:generateContent"
+            currentPath.isBlank() || currentPath == "/" -> "/models/$cleanModel:generateContent"
+            else -> "$currentPath/models/$cleanModel:generateContent"
+        }
+        return parsed.newBuilder().encodedPath(generatePath).build()
     }
 
     private fun edgeProsodyPercent(value: Float): Int =
