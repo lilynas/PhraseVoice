@@ -11,6 +11,7 @@ import com.phrasevoice.data.model.ProviderConfig
 import com.phrasevoice.data.security.ApiKeyCipher
 import com.phrasevoice.data.tts.EdgeForwarderCatalog
 import com.phrasevoice.data.tts.GeminiTtsCatalog
+import com.phrasevoice.data.tts.MimoTtsCatalog
 import com.phrasevoice.debug.AppLogger
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
@@ -143,8 +144,8 @@ class ProviderConfigRepository(
                     providerId = MIMO,
                     enabled = false,
                     baseUrl = "https://api.xiaomimimo.com/v1/chat/completions",
-                    model = "mimo-v2.5-tts",
-                    defaultVoice = "mimo_default",
+                    model = MimoTtsCatalog.PRESET_MODEL_ID,
+                    defaultVoice = MimoTtsCatalog.DEFAULT_VOICE_ID,
                 ),
                 ProviderConfig(
                     providerId = CUSTOM_HTTP,

@@ -9,6 +9,7 @@ import com.phrasevoice.data.model.ProviderConfig
 import com.phrasevoice.data.repository.ProviderConfigRepository
 import com.phrasevoice.data.tts.AudioPlaybackController
 import com.phrasevoice.data.tts.CloudTtsService
+import com.phrasevoice.data.tts.MimoTtsCatalog
 import com.phrasevoice.debug.AppLogger
 import com.phrasevoice.domain.model.AudioFormat
 import com.phrasevoice.domain.tts.TtsRequest
@@ -46,6 +47,12 @@ data class ProviderSettingsUiState(
 
     val isGemini: Boolean
         get() = selectedProviderId == ProviderConfigRepository.GEMINI
+
+    val isMimo: Boolean
+        get() = selectedProviderId == ProviderConfigRepository.MIMO
+
+    val isMimoVoiceDesign: Boolean
+        get() = isMimo && MimoTtsCatalog.isVoiceDesignModel(modelDraft)
 }
 
 class ProviderSettingsViewModel(
@@ -82,7 +89,20 @@ class ProviderSettingsViewModel(
     fun updateEnabled(value: Boolean) = _uiState.update { it.copy(enabledDraft = value, savedMessage = null) }
     fun updateApiKeyDraft(value: String) = _uiState.update { it.copy(apiKeyDraft = value, savedMessage = null) }
     fun updateBaseUrlDraft(value: String) = _uiState.update { it.copy(baseUrlDraft = value, savedMessage = null) }
-    fun updateModelDraft(value: String) = _uiState.update { it.copy(modelDraft = value, savedMessage = null) }
+    fun updateModelDraft(value: String) = _uiState.update { state ->
+        val voiceDraft = if (state.isMimo) {
+            when {
+                MimoTtsCatalog.isVoiceDesignModel(value) &&
+                    MimoTtsCatalog.isPresetVoice(state.voiceDraft) -> MimoTtsCatalog.DEFAULT_VOICE_DESIGN_PROMPT
+                !MimoTtsCatalog.isVoiceDesignModel(value) &&
+                    !MimoTtsCatalog.isPresetVoice(state.voiceDraft) -> MimoTtsCatalog.DEFAULT_VOICE_ID
+                else -> state.voiceDraft
+            }
+        } else {
+            state.voiceDraft
+        }
+        state.copy(modelDraft = value, voiceDraft = voiceDraft, savedMessage = null)
+    }
     fun updateVoiceDraft(value: String) = _uiState.update { it.copy(voiceDraft = value, savedMessage = null) }
     fun updateMethodDraft(value: String) = _uiState.update { it.copy(methodDraft = value, savedMessage = null) }
     fun updateHeadersDraft(value: String) = _uiState.update { it.copy(headersDraft = value, savedMessage = null) }
@@ -119,6 +139,7 @@ class ProviderSettingsViewModel(
         if (state.selectedProviderId != ProviderConfigRepository.OPENAI &&
             state.selectedProviderId != ProviderConfigRepository.EDGE_TTS_FORWARDER &&
             state.selectedProviderId != ProviderConfigRepository.GEMINI &&
+            state.selectedProviderId != ProviderConfigRepository.MIMO &&
             state.selectedProviderId != ProviderConfigRepository.CUSTOM_HTTP
         ) {
             _uiState.update { it.copy(savedMessage = "当前 Provider 不需要云端试听") }
@@ -139,7 +160,7 @@ class ProviderSettingsViewModel(
                     pitch = 1.0f,
                     volume = 1.0f,
                     stylePrompt = "自然、清晰、适合日常交流",
-                    outputFormat = if (state.isGemini) AudioFormat.WAV else AudioFormat.MP3,
+                    outputFormat = if (state.isGemini || state.isMimo) AudioFormat.WAV else AudioFormat.MP3,
                 )
                 when (val result = cloudTtsService.synthesize(request, runtimeConfig, cache = true)) {
                     is TtsResult.AudioFile -> {
@@ -207,14 +228,24 @@ class ProviderSettingsViewModel(
 
     private fun ProviderSettingsUiState.withSelectedConfig(config: ProviderConfig): ProviderSettingsUiState {
         val customSettings = PhraseVoiceJson.decode(config.extraJson, CustomHttpSettings())
+        val modelDraft = config.model.orEmpty()
+        val voiceDraft = if (
+            config.providerId == ProviderConfigRepository.MIMO &&
+            MimoTtsCatalog.isVoiceDesignModel(modelDraft) &&
+            MimoTtsCatalog.isPresetVoice(config.defaultVoice)
+        ) {
+            MimoTtsCatalog.DEFAULT_VOICE_DESIGN_PROMPT
+        } else {
+            config.defaultVoice.orEmpty()
+        }
         return copy(
             selectedProviderId = config.providerId,
             enabledDraft = config.enabled,
             apiKeyDraft = "",
             hasSavedApiKey = !config.encryptedValue.isNullOrBlank(),
             baseUrlDraft = config.baseUrl.orEmpty(),
-            modelDraft = config.model.orEmpty(),
-            voiceDraft = config.defaultVoice.orEmpty(),
+            modelDraft = modelDraft,
+            voiceDraft = voiceDraft,
             methodDraft = customSettings.method,
             headersDraft = customSettings.headersTemplate,
             bodyDraft = customSettings.bodyTemplate,

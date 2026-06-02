@@ -15,6 +15,7 @@ import com.phrasevoice.data.tts.CloudTtsService
 import com.phrasevoice.data.tts.EdgeForwarderCatalog
 import com.phrasevoice.data.tts.EdgeForwarderStyle
 import com.phrasevoice.data.tts.GeminiTtsCatalog
+import com.phrasevoice.data.tts.MimoTtsCatalog
 import com.phrasevoice.debug.AppLogger
 import com.phrasevoice.domain.model.AudioFormat
 import com.phrasevoice.domain.tts.TtsRequest
@@ -203,7 +204,6 @@ class HomeViewModel(
                 errorMessage = when {
                     androidUnavailable -> it.androidTtsMessage
                     option.enabled -> null
-                    providerId == ProviderConfigRepository.MIMO -> "MiMo TTS 已加入计划，后续会接入预置音色和 VoiceDesign 角色声音。"
                     else -> "${option.name} 尚未启用，请先在 Provider 页面保存配置。"
                 },
             )
@@ -401,6 +401,7 @@ class HomeViewModel(
             ProviderConfigRepository.OPENAI,
             ProviderConfigRepository.EDGE_TTS_FORWARDER,
             ProviderConfigRepository.GEMINI,
+            ProviderConfigRepository.MIMO,
             ProviderConfigRepository.CUSTOM_HTTP -> {
                 val settings = settingsRepository.currentSettings()
                 if (playAudioFile && !settings.keepAudioCache) {
@@ -419,7 +420,6 @@ class HomeViewModel(
                 result
             }
 
-            ProviderConfigRepository.MIMO -> TtsResult.Error("MiMo TTS 已加入计划，后续会接入预置音色和 VoiceDesign 角色声音。")
             else -> TtsResult.Error("未知 Provider：${request.providerId}")
         }
     }
@@ -427,7 +427,8 @@ class HomeViewModel(
     private fun outputFormatForSelectedProvider(): AudioFormat =
         when (uiState.value.selectedProviderId) {
             ProviderConfigRepository.ANDROID_SYSTEM,
-            ProviderConfigRepository.GEMINI -> AudioFormat.WAV
+            ProviderConfigRepository.GEMINI,
+            ProviderConfigRepository.MIMO -> AudioFormat.WAV
             else -> AudioFormat.MP3
         }
 
@@ -471,7 +472,6 @@ class HomeViewModel(
             note = when {
                 providerId == ProviderConfigRepository.ANDROID_SYSTEM && !androidTtsReady ->
                     androidTtsMessage ?: "系统 TTS 不可用"
-                providerId == ProviderConfigRepository.MIMO -> "角色声音计划"
                 !enabled -> "未启用"
                 else -> null
             },
@@ -543,14 +543,39 @@ class HomeViewModel(
 
     private fun mimoVoices(): List<TtsVoice> {
         val providerId = ProviderConfigRepository.MIMO
-        val configured = providerConfigs.firstOrNull { it.providerId == providerId }?.defaultVoice
-        val defaults = listOf("mimo_default", "冰糖", "茉莉", "苏打", "白桦", "Mia", "Chloe", "Milo", "Dean")
-        return (listOfNotNull(configured?.takeIf { it.isNotBlank() }) + defaults)
-            .distinct()
-            .map { voice ->
+        val config = providerConfigs.firstOrNull { it.providerId == providerId }
+        if (MimoTtsCatalog.isVoiceDesignModel(config?.model)) {
+            val description = config?.defaultVoice
+                ?.takeIf { it.isNotBlank() }
+                ?: MimoTtsCatalog.DEFAULT_VOICE_DESIGN_PROMPT
+            return listOf(
+                TtsVoice(
+                    id = description,
+                    name = "VoiceDesign 角色声音",
+                    language = null,
+                    description = description,
+                    providerId = providerId,
+                ),
+            )
+        }
+        val configured = config?.defaultVoice
+        val defaults = MimoTtsCatalog.presetVoices.map { voice ->
+            voice.id to buildString {
+                append(voice.name)
+                voice.language?.let { append(" $it") }
+                voice.gender?.let { append(" $it") }
+            }
+        }
+        val configuredVoice = configured
+            ?.takeIf { it.isNotBlank() }
+            ?.takeUnless { voice -> defaults.any { it.first == voice } }
+            ?.let { it to it }
+        return (listOfNotNull(configuredVoice) + defaults)
+            .distinctBy { it.first }
+            .map { (voice, name) ->
                 TtsVoice(
                     id = voice,
-                    name = voice,
+                    name = name,
                     language = null,
                     providerId = providerId,
                 )

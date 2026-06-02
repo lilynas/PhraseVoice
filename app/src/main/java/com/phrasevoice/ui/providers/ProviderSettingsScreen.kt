@@ -43,6 +43,7 @@ import com.phrasevoice.data.model.ProviderConfig
 import com.phrasevoice.data.repository.ProviderConfigRepository
 import com.phrasevoice.data.tts.EdgeForwarderCatalog
 import com.phrasevoice.data.tts.GeminiTtsCatalog
+import com.phrasevoice.data.tts.MimoTtsCatalog
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -103,18 +104,13 @@ fun ProviderSettingsScreen(
                     Switch(
                         checked = state.enabledDraft,
                         onCheckedChange = onEnabledChange,
-                        enabled = state.selectedProviderId != ProviderConfigRepository.ANDROID_SYSTEM &&
-                            state.selectedProviderId != ProviderConfigRepository.MIMO,
+                        enabled = state.selectedProviderId != ProviderConfigRepository.ANDROID_SYSTEM,
                     )
                 }
 
                 when (state.selectedProviderId) {
                     ProviderConfigRepository.ANDROID_SYSTEM -> {
                         Text("系统 TTS 使用手机已安装的语音服务，无需 API Key。")
-                    }
-
-                    ProviderConfigRepository.MIMO -> {
-                        Text("MiMo TTS 已加入计划。后续会接入预置音色和 VoiceDesign 角色声音：用文本描述生成专属角色音色，试听后保存为本地角色声音预设。")
                     }
 
                     else -> {
@@ -144,6 +140,10 @@ fun ProviderSettingsScreen(
                             Text("使用 Gemini generateContent TTS 接口。Gemini 返回 PCM 音频，App 会自动封装为 WAV。")
                         }
 
+                        if (state.isMimo) {
+                            Text("使用 MiMo V2.5 TTS。预置音色可直接选择；VoiceDesign 模式会用文本描述生成专属角色声音。")
+                        }
+
                         OutlinedTextField(
                             value = state.baseUrlDraft,
                             onValueChange = onBaseUrlChange,
@@ -152,6 +152,7 @@ fun ProviderSettingsScreen(
                                     when {
                                         state.isEdgeForwarder -> "Forwarder URL"
                                         state.isGemini -> "Gemini Base URL"
+                                        state.isMimo -> "MiMo Base URL"
                                         else -> "Base URL"
                                     },
                                 )
@@ -160,7 +161,12 @@ fun ProviderSettingsScreen(
                             modifier = Modifier.fillMaxWidth(),
                         )
 
-                        if (!state.isEdgeForwarder) {
+                        if (state.isMimo) {
+                            MimoModelDropdown(
+                                modelDraft = state.modelDraft,
+                                onModelChange = onModelChange,
+                            )
+                        } else if (!state.isEdgeForwarder) {
                             OutlinedTextField(
                                 value = state.modelDraft,
                                 onValueChange = onModelChange,
@@ -177,6 +183,21 @@ fun ProviderSettingsScreen(
                             )
                         } else if (state.isGemini) {
                             GeminiVoiceDropdown(
+                                voiceDraft = state.voiceDraft,
+                                onVoiceChange = onVoiceChange,
+                            )
+                        } else if (state.isMimoVoiceDesign) {
+                            OutlinedTextField(
+                                value = state.voiceDraft,
+                                onValueChange = onVoiceChange,
+                                label = { Text("VoiceDesign 音色描述") },
+                                minLines = 4,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .heightIn(min = 136.dp),
+                            )
+                        } else if (state.isMimo) {
+                            MimoVoiceDropdown(
                                 voiceDraft = state.voiceDraft,
                                 onVoiceChange = onVoiceChange,
                             )
@@ -241,7 +262,6 @@ private fun ProviderSummaryCard(
                 }
                 Text(
                     text = when {
-                        config.providerId == ProviderConfigRepository.MIMO -> "角色声音计划"
                         config.enabled -> "已启用"
                         else -> "未启用"
                     },
@@ -350,6 +370,109 @@ private fun GeminiVoiceDropdown(
                         Column {
                             Text(voice.id, maxLines = 1, overflow = TextOverflow.Ellipsis)
                             Text(voice.tone, style = MaterialTheme.typography.bodySmall)
+                        }
+                    },
+                    onClick = {
+                        expanded = false
+                        onVoiceChange(voice.id)
+                    },
+                )
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun MimoModelDropdown(
+    modelDraft: String,
+    onModelChange: (String) -> Unit,
+) {
+    var expanded by remember { mutableStateOf(false) }
+    val models = MimoTtsCatalog.models
+    val selectedName = models
+        .firstOrNull { it.id == modelDraft }
+        ?.let { "${it.name} (${it.id})" }
+        ?: modelDraft
+
+    ExposedDropdownMenuBox(
+        expanded = expanded,
+        onExpandedChange = { expanded = !expanded },
+    ) {
+        OutlinedTextField(
+            modifier = Modifier
+                .menuAnchor()
+                .fillMaxWidth(),
+            readOnly = true,
+            value = selectedName,
+            onValueChange = {},
+            label = { Text("模型") },
+            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+        )
+        ExposedDropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false },
+        ) {
+            models.forEach { model ->
+                DropdownMenuItem(
+                    text = {
+                        Column {
+                            Text(model.name, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Text(model.description, style = MaterialTheme.typography.bodySmall)
+                        }
+                    },
+                    onClick = {
+                        expanded = false
+                        onModelChange(model.id)
+                    },
+                )
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun MimoVoiceDropdown(
+    voiceDraft: String,
+    onVoiceChange: (String) -> Unit,
+) {
+    var expanded by remember { mutableStateOf(false) }
+    val voices = MimoTtsCatalog.presetVoices
+    val selectedName = voices
+        .firstOrNull { it.id == voiceDraft }
+        ?.let { voice ->
+            listOfNotNull(voice.name, voice.language, voice.gender).joinToString(" ")
+        }
+        ?: voiceDraft
+
+    ExposedDropdownMenuBox(
+        expanded = expanded,
+        onExpandedChange = { expanded = !expanded },
+    ) {
+        OutlinedTextField(
+            modifier = Modifier
+                .menuAnchor()
+                .fillMaxWidth(),
+            readOnly = true,
+            value = selectedName,
+            onValueChange = {},
+            label = { Text("默认 Voice") },
+            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+        )
+        ExposedDropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false },
+        ) {
+            voices.forEach { voice ->
+                DropdownMenuItem(
+                    text = {
+                        Column {
+                            Text(voice.name, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Text(
+                                listOfNotNull(voice.language, voice.gender).joinToString(" ").ifBlank { voice.id },
+                                style = MaterialTheme.typography.bodySmall,
+                            )
                         }
                     },
                     onClick = {

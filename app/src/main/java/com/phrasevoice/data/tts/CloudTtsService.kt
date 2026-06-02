@@ -48,6 +48,7 @@ class CloudTtsService(
             ProviderConfigRepository.OPENAI -> synthesizeOpenAiCompatible(request, runtimeConfig, cache)
             ProviderConfigRepository.EDGE_TTS_FORWARDER -> synthesizeEdgeTtsForwarder(request, runtimeConfig, cache)
             ProviderConfigRepository.GEMINI -> synthesizeGeminiTts(request, runtimeConfig, cache)
+            ProviderConfigRepository.MIMO -> synthesizeMimoTts(request, runtimeConfig, cache)
             ProviderConfigRepository.CUSTOM_HTTP -> synthesizeCustomHttp(request, runtimeConfig, cache)
             else -> TtsResult.Error("该 Provider 暂未接入。")
         }
@@ -183,6 +184,83 @@ class CloudTtsService(
             .build()
 
         return executeGeminiAudioRequest(httpRequest, target.file, target.uri, target.mimeType)
+    }
+
+    private fun synthesizeMimoTts(
+        request: TtsRequest,
+        runtimeConfig: RuntimeProviderConfig,
+        cache: Boolean,
+    ): TtsResult {
+        val apiKey = runtimeConfig.apiKey
+        if (apiKey.isNullOrBlank()) return TtsResult.Error("请先在 Provider 页面保存 MiMo API Key。")
+        val config = runtimeConfig.config
+        val model = config.model?.takeIf { it.isNotBlank() } ?: MimoTtsCatalog.PRESET_MODEL_ID
+        val baseUrl = config.baseUrl?.takeIf { it.isNotBlank() }
+            ?: return TtsResult.Error("请先配置 MiMo Base URL。")
+        val endpoint = mimoChatCompletionsEndpoint(baseUrl)
+            ?: return TtsResult.Error("MiMo Base URL 无效。")
+        val target = audioFileStore.createTarget(AudioFormat.WAV, cache = cache)
+        val voiceDesign = MimoTtsCatalog.isVoiceDesignModel(model)
+        val voiceOrDescription = request.voiceId ?: config.defaultVoice
+        val userInstruction = if (voiceDesign) {
+            voiceOrDescription?.takeIf { it.isNotBlank() }
+                ?: return TtsResult.Error("请先填写 MiMo VoiceDesign 音色描述。")
+        } else {
+            request.stylePrompt.orEmpty()
+        }
+        val messages = buildList {
+            userInstruction.takeIf { it.isNotBlank() }?.let { instruction ->
+                add(
+                    JsonObject(
+                        mapOf(
+                            "role" to JsonPrimitive("user"),
+                            "content" to JsonPrimitive(instruction),
+                        ),
+                    ),
+                )
+            }
+            add(
+                JsonObject(
+                    mapOf(
+                        "role" to JsonPrimitive("assistant"),
+                        "content" to JsonPrimitive(request.text),
+                    ),
+                ),
+            )
+        }
+        val audio = if (voiceDesign) {
+            JsonObject(
+                mapOf(
+                    "format" to JsonPrimitive(AudioFormat.WAV.extension),
+                    "optimize_text_preview" to JsonPrimitive(false),
+                ),
+            )
+        } else {
+            JsonObject(
+                mapOf(
+                    "format" to JsonPrimitive(AudioFormat.WAV.extension),
+                    "voice" to JsonPrimitive(
+                        voiceOrDescription?.takeIf { it.isNotBlank() } ?: MimoTtsCatalog.DEFAULT_VOICE_ID,
+                    ),
+                ),
+            )
+        }
+        val body = JsonObject(
+            mapOf(
+                "model" to JsonPrimitive(model),
+                "messages" to JsonArray(messages),
+                "audio" to audio,
+            ),
+        ).toString()
+        AppLogger.i(TAG, "mimo request url=${endpoint.toString().safeUrlForLog()} model=$model voiceDesign=$voiceDesign")
+        val httpRequest = Request.Builder()
+            .url(endpoint)
+            .addHeader("api-key", apiKey)
+            .addHeader("Content-Type", "application/json")
+            .post(body.toRequestBody(JSON_MEDIA_TYPE))
+            .build()
+
+        return executeMimoAudioRequest(httpRequest, target.file, target.uri, target.mimeType)
     }
 
     private fun synthesizeCustomHttp(
@@ -346,6 +424,27 @@ class CloudTtsService(
             TtsResult.Error("解析 Gemini 音频响应失败：${throwable.message ?: "未知错误"}", throwable)
         }
 
+    private fun executeMimoAudioRequest(
+        request: Request,
+        file: File,
+        uri: Uri,
+        mimeType: String,
+    ): TtsResult =
+        runCatching {
+            httpClient.newCall(request).execute().use { response ->
+                AppLogger.i(TAG, "mimo response code=${response.code} url=${request.url.toString().safeUrlForLog()}")
+                if (!response.isSuccessful) return response.toTtsError()
+                val json = response.body?.string() ?: return TtsResult.Error("MiMo 没有返回 JSON。")
+                val audio = MimoTtsResponseParser.parseAudio(json)
+                file.writeBytes(audio.audioBytes)
+                AppLogger.i(TAG, "mimo wav saved bytes=${file.length()} uri=$uri")
+                TtsResult.AudioFile(uri = uri, mimeType = mimeType)
+            }
+        }.getOrElse { throwable ->
+            AppLogger.e(TAG, "mimo request failed url=${request.url.toString().safeUrlForLog()}", throwable)
+            TtsResult.Error("解析 MiMo 音频响应失败：${throwable.message ?: "未知错误"}", throwable)
+        }
+
     private fun findJsonString(json: String, path: String): String? {
         var current: JsonElement = kotlinx.serialization.json.Json.parseToJsonElement(json)
         path.split(".").filter { it.isNotBlank() }.forEach { key ->
@@ -381,6 +480,20 @@ class CloudTtsService(
             else -> "$currentPath/models/$cleanModel:generateContent"
         }
         return parsed.newBuilder().encodedPath(generatePath).build()
+    }
+
+    private fun mimoChatCompletionsEndpoint(baseUrl: String): HttpUrl? {
+        val parsed = baseUrl.trim().toHttpUrlOrNull() ?: return null
+        if (parsed.encodedPath.trimEnd('/').endsWith("/chat/completions")) {
+            return parsed
+        }
+        val rootPath = parsed.encodedPath.trimEnd('/')
+        val apiPath = if (rootPath.isBlank()) {
+            "/chat/completions"
+        } else {
+            "$rootPath/chat/completions"
+        }
+        return parsed.newBuilder().encodedPath(apiPath).build()
     }
 
     private fun edgeProsodyPercent(value: Float): Int =
