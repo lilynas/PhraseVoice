@@ -10,7 +10,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Cloud
+import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.PhoneAndroid
 import androidx.compose.material.icons.outlined.PlayArrow
 import androidx.compose.material.icons.outlined.Save
@@ -62,6 +64,12 @@ fun ProviderSettingsScreen(
     onResponseFieldChange: (String) -> Unit,
     onMimoOptimizeTextPreviewChange: (Boolean) -> Unit,
     onMimoPromptOptimizerModelChange: (String) -> Unit,
+    onMimoUseStreamingChange: (Boolean) -> Unit,
+    onMimoVoiceDesignPresetSelected: (String) -> Unit,
+    onMimoVoiceDesignPresetNameChange: (String) -> Unit,
+    onAddMimoVoiceDesignPreset: () -> Unit,
+    onSaveMimoVoiceDesignPreset: () -> Unit,
+    onDeleteMimoVoiceDesignPreset: () -> Unit,
     onOptimizeMimoVoiceDesign: () -> Unit,
     onSave: () -> Unit,
     onTestVoice: () -> Unit,
@@ -169,6 +177,10 @@ fun ProviderSettingsScreen(
                                 modelDraft = state.modelDraft,
                                 onModelChange = onModelChange,
                             )
+                            MimoStreamingFields(
+                                state = state,
+                                onMimoUseStreamingChange = onMimoUseStreamingChange,
+                            )
                         } else if (!state.isEdgeForwarder) {
                             OutlinedTextField(
                                 value = state.modelDraft,
@@ -195,6 +207,11 @@ fun ProviderSettingsScreen(
                                 onVoiceChange = onVoiceChange,
                                 onMimoOptimizeTextPreviewChange = onMimoOptimizeTextPreviewChange,
                                 onMimoPromptOptimizerModelChange = onMimoPromptOptimizerModelChange,
+                                onMimoVoiceDesignPresetSelected = onMimoVoiceDesignPresetSelected,
+                                onMimoVoiceDesignPresetNameChange = onMimoVoiceDesignPresetNameChange,
+                                onAddMimoVoiceDesignPreset = onAddMimoVoiceDesignPreset,
+                                onSaveMimoVoiceDesignPreset = onSaveMimoVoiceDesignPreset,
+                                onDeleteMimoVoiceDesignPreset = onDeleteMimoVoiceDesignPreset,
                                 onOptimizeMimoVoiceDesign = onOptimizeMimoVoiceDesign,
                             )
                         } else if (state.isMimo) {
@@ -247,13 +264,103 @@ fun ProviderSettingsScreen(
 }
 
 @Composable
+private fun MimoStreamingFields(
+    state: ProviderSettingsUiState,
+    onMimoUseStreamingChange: (Boolean) -> Unit,
+) {
+    Row(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text("MiMo 流式合成")
+            Text(
+                "使用 pcm16 流式响应，完成后自动封装为 WAV。",
+                style = MaterialTheme.typography.bodySmall,
+            )
+        }
+        Switch(
+            checked = state.mimoUseStreamingDraft,
+            onCheckedChange = onMimoUseStreamingChange,
+            enabled = !state.isTesting && !state.isOptimizingVoiceDesign,
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun MimoVoiceDesignPresetDropdown(
+    state: ProviderSettingsUiState,
+    onMimoVoiceDesignPresetSelected: (String) -> Unit,
+) {
+    var expanded by remember { mutableStateOf(false) }
+    val selectedName = state.mimoVoiceDesignPresetsDraft
+        .firstOrNull { it.id == state.mimoSelectedVoiceDesignPresetIdDraft }
+        ?.name
+        ?: "默认角色"
+
+    ExposedDropdownMenuBox(
+        expanded = expanded,
+        onExpandedChange = { expanded = !expanded },
+    ) {
+        OutlinedTextField(
+            modifier = Modifier
+                .menuAnchor()
+                .fillMaxWidth(),
+            readOnly = true,
+            value = selectedName,
+            onValueChange = {},
+            label = { Text("角色声音") },
+            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+        )
+        ExposedDropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false },
+        ) {
+            state.mimoVoiceDesignPresetsDraft.forEach { preset ->
+                DropdownMenuItem(
+                    text = {
+                        Column {
+                            Text(preset.name, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Text(
+                                preset.description,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis,
+                                style = MaterialTheme.typography.bodySmall,
+                            )
+                        }
+                    },
+                    onClick = {
+                        expanded = false
+                        onMimoVoiceDesignPresetSelected(preset.id)
+                    },
+                )
+            }
+        }
+    }
+}
+
+@Composable
 private fun MimoVoiceDesignFields(
     state: ProviderSettingsUiState,
     onVoiceChange: (String) -> Unit,
     onMimoOptimizeTextPreviewChange: (Boolean) -> Unit,
     onMimoPromptOptimizerModelChange: (String) -> Unit,
+    onMimoVoiceDesignPresetSelected: (String) -> Unit,
+    onMimoVoiceDesignPresetNameChange: (String) -> Unit,
+    onAddMimoVoiceDesignPreset: () -> Unit,
+    onSaveMimoVoiceDesignPreset: () -> Unit,
+    onDeleteMimoVoiceDesignPreset: () -> Unit,
     onOptimizeMimoVoiceDesign: () -> Unit,
 ) {
+    MimoVoiceDesignPresetDropdown(
+        state = state,
+        onMimoVoiceDesignPresetSelected = onMimoVoiceDesignPresetSelected,
+    )
+    OutlinedTextField(
+        value = state.mimoVoiceDesignPresetNameDraft,
+        onValueChange = onMimoVoiceDesignPresetNameChange,
+        label = { Text("角色名称") },
+        singleLine = true,
+        modifier = Modifier.fillMaxWidth(),
+    )
     OutlinedTextField(
         value = state.voiceDraft,
         onValueChange = onVoiceChange,
@@ -280,7 +387,38 @@ private fun MimoVoiceDesignFields(
         Icon(Icons.Outlined.Tune, contentDescription = null)
         Text(if (state.isOptimizingVoiceDesign) "优化中" else "优化音色描述")
     }
-    Row {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        OutlinedButton(
+            onClick = onAddMimoVoiceDesignPreset,
+            enabled = !state.isTesting && !state.isOptimizingVoiceDesign,
+            modifier = Modifier.weight(1f),
+        ) {
+            Icon(Icons.Outlined.Add, contentDescription = null)
+            Text("新增角色")
+        }
+        OutlinedButton(
+            onClick = onSaveMimoVoiceDesignPreset,
+            enabled = !state.isTesting && !state.isOptimizingVoiceDesign && state.voiceDraft.isNotBlank(),
+            modifier = Modifier.weight(1f),
+        ) {
+            Icon(Icons.Outlined.Save, contentDescription = null)
+            Text("暂存角色")
+        }
+    }
+    OutlinedButton(
+        onClick = onDeleteMimoVoiceDesignPreset,
+        enabled = !state.isTesting &&
+            !state.isOptimizingVoiceDesign &&
+            state.mimoVoiceDesignPresetsDraft.size > 1,
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Icon(Icons.Outlined.Delete, contentDescription = null)
+        Text("删除当前角色")
+    }
+    Row(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.weight(1f)) {
             Text("试听文本智能优化")
             Text(

@@ -16,8 +16,8 @@
 - Implement `OpenAiTtsProvider` with `gpt-4o-mini-tts` as the default model.
 - Implement `EdgeTtsForwarderProvider` for user-managed `ms-ra-forwarder` instances.
 - Implement `GeminiTtsProvider` with isolated response parsing. Done.
-- Implement `MiMoTtsProvider` for Xiaomi MiMo V2.5 TTS using the official chat completions speech synthesis API. Done for non-streaming preset voices.
-- Add MiMo VoiceDesign character voices so users can create, preview, and reuse custom role voices from text descriptions. Initial single-description VoiceDesign mode is implemented; multi-preset character storage remains future work.
+- Implement `MiMoTtsProvider` for Xiaomi MiMo V2.5 TTS using the official chat completions speech synthesis API. Done for preset voices, VoiceDesign, and compatible streaming synthesis.
+- Add MiMo VoiceDesign character voices so users can create, preview, and reuse custom role voices from text descriptions. Done with a local multi-preset character voice library.
 - Implement `CustomHttpTtsProvider` for OpenAI-compatible services, user-managed Edge TTS servers, and other TTS endpoints.
 - Add secure provider settings for API keys, base URLs, headers, models, voices, and request templates.
 
@@ -38,14 +38,15 @@
 - Default voice: `mimo_default`, with built-in choices such as `冰糖`, `茉莉`, `苏打`, `白桦`, `Mia`, `Chloe`, `Milo`, and `Dean`.
 - Request shape: place style/control instructions in the `user` message when present, place the target text in the `assistant` message, and set `audio.format` / `audio.voice`.
 - Response parsing: decode the base64 audio payload from the returned message audio data into a local audio file.
-- Current implementation supports non-streaming WAV responses; streaming and voice clone uploads remain out of scope.
+- Compatible streaming: request `stream=true` with `audio.format=pcm16`, concatenate `delta.audio.data` chunks, and wrap the resulting 24 kHz mono PCM as WAV. Done.
+- Voice clone uploads remain out of scope.
 
 ### MiMo VoiceDesign Plan
 
 - Add a separate character voice design mode for `mimo-v2.5-tts-voicedesign` rather than treating it as another preset voice ID. Done.
-- Voice description input: collect role/persona, age/gender, timbre, emotion, rhythm, accent/dialect, and optional scene notes as a reusable local preset. Initial implementation stores one default description in Provider settings; a multi-preset library remains future work.
+- Voice description input: collect role/persona, age/gender, timbre, emotion, rhythm, accent/dialect, and optional scene notes as reusable local presets. Done.
 - Request shape: place the voice design description in the required `user` message and the preview/synthesis text in the `assistant` message. Done.
-- Preview flow: synthesize a short sample, allow retrying the same description, then save the character voice preset for later phrase reading. Initial Provider "save and test" preview is implemented.
+- Preview flow: synthesize a short sample, allow retrying the same description, then save the character voice preset for later phrase reading. Provider "save and test" preview is implemented.
 - Add one-click VoiceDesign description optimization through a MiMo chat model. Done.
 - Optional text preview: support MiMo's `audio.optimize_text_preview` flag so the preview text can be improved for the designed voice when the user opts in. Done.
 - Initial scope excludes voice cloning uploads; VoiceClone can be added later after privacy, file-size, and consent UX are designed.

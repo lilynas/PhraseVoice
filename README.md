@@ -15,10 +15,10 @@ Phase 1 MVP is in progress:
 - Provider abstraction ready for cloud providers
 - Edge TTS Forwarder provider for user-managed `ms-ra-forwarder` instances, with voice and style dropdowns
 - Gemini TTS provider through Google `generateContent`, with preset voice dropdowns and WAV output wrapping
-- Xiaomi MiMo V2.5 TTS provider with preset voices, VoiceDesign, description optimization, and optional preview text optimization
+- Xiaomi MiMo V2.5 TTS provider with preset voices, VoiceDesign character voice presets, description optimization, optional preview text optimization, and optional compatible streaming synthesis
 - GitHub Actions CI for build and unit test verification
 
-Phase 2 will continue with multi-preset MiMo character voices and broader Custom HTTP presets.
+Phase 2 will continue with broader Custom HTTP presets.
 
 ## Build Verification
 

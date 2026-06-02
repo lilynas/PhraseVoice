@@ -29,6 +29,18 @@ data class CustomHttpSettings(
 data class MimoSettings(
     val optimizeTextPreview: Boolean = false,
     val promptOptimizerModel: String = "mimo-v2.5",
+    val useStreaming: Boolean = false,
+    val selectedVoiceDesignPresetId: String? = null,
+    val voiceDesignPresets: List<MimoVoiceDesignPreset> = emptyList(),
+)
+
+@Serializable
+data class MimoVoiceDesignPreset(
+    val id: String,
+    val name: String,
+    val description: String,
+    val createdAt: Long = 0L,
+    val updatedAt: Long = 0L,
 )
 
 @Serializable

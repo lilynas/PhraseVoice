@@ -6,6 +6,7 @@ import com.phrasevoice.data.local.PhraseVoiceJson
 import com.phrasevoice.data.model.CustomHttpResponseType
 import com.phrasevoice.data.model.CustomHttpSettings
 import com.phrasevoice.data.model.MimoSettings
+import com.phrasevoice.data.model.MimoVoiceDesignPreset
 import com.phrasevoice.data.model.ProviderConfig
 import com.phrasevoice.data.repository.ProviderConfigRepository
 import com.phrasevoice.data.repository.RuntimeProviderConfig
@@ -20,6 +21,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import java.util.UUID
 
 data class ProviderSettingsUiState(
     val configs: List<ProviderConfig> = emptyList(),
@@ -37,6 +39,10 @@ data class ProviderSettingsUiState(
     val responseFieldDraft: String = "audio",
     val mimoOptimizeTextPreviewDraft: Boolean = false,
     val mimoPromptOptimizerModelDraft: String = MimoTtsCatalog.DEFAULT_PROMPT_OPTIMIZER_MODEL_ID,
+    val mimoUseStreamingDraft: Boolean = false,
+    val mimoVoiceDesignPresetsDraft: List<MimoVoiceDesignPreset> = emptyList(),
+    val mimoSelectedVoiceDesignPresetIdDraft: String? = null,
+    val mimoVoiceDesignPresetNameDraft: String = "",
     val savedMessage: String? = null,
     val isTesting: Boolean = false,
     val isOptimizingVoiceDesign: Boolean = false,
@@ -106,7 +112,12 @@ class ProviderSettingsViewModel(
         } else {
             state.voiceDraft
         }
-        state.copy(modelDraft = value, voiceDraft = voiceDraft, savedMessage = null)
+        val next = state.copy(modelDraft = value, voiceDraft = voiceDraft, savedMessage = null)
+        if (state.isMimo && MimoTtsCatalog.isVoiceDesignModel(value)) {
+            next.ensureMimoVoiceDesignDrafts()
+        } else {
+            next
+        }
     }
     fun updateVoiceDraft(value: String) = _uiState.update { it.copy(voiceDraft = value, savedMessage = null) }
     fun updateMethodDraft(value: String) = _uiState.update { it.copy(methodDraft = value, savedMessage = null) }
@@ -123,6 +134,105 @@ class ProviderSettingsViewModel(
 
     fun updateMimoPromptOptimizerModelDraft(value: String) =
         _uiState.update { it.copy(mimoPromptOptimizerModelDraft = value, savedMessage = null) }
+
+    fun updateMimoUseStreamingDraft(value: Boolean) =
+        _uiState.update { it.copy(mimoUseStreamingDraft = value, savedMessage = null) }
+
+    fun updateMimoVoiceDesignPresetNameDraft(value: String) =
+        _uiState.update { it.copy(mimoVoiceDesignPresetNameDraft = value, savedMessage = null) }
+
+    fun selectMimoVoiceDesignPreset(presetId: String) {
+        _uiState.update { state ->
+            val preset = state.mimoVoiceDesignPresetsDraft.firstOrNull { it.id == presetId } ?: return@update state
+            state.copy(
+                mimoSelectedVoiceDesignPresetIdDraft = preset.id,
+                mimoVoiceDesignPresetNameDraft = preset.name,
+                voiceDraft = preset.description,
+                savedMessage = null,
+            )
+        }
+    }
+
+    fun addMimoVoiceDesignPreset() {
+        _uiState.update { state ->
+            val now = System.currentTimeMillis()
+            val preset = MimoVoiceDesignPreset(
+                id = UUID.randomUUID().toString(),
+                name = "新角色声音",
+                description = MimoTtsCatalog.DEFAULT_VOICE_DESIGN_PROMPT,
+                createdAt = now,
+                updatedAt = now,
+            )
+            state.copy(
+                mimoVoiceDesignPresetsDraft = state.mimoVoiceDesignPresetsDraft + preset,
+                mimoSelectedVoiceDesignPresetIdDraft = preset.id,
+                mimoVoiceDesignPresetNameDraft = preset.name,
+                voiceDraft = preset.description,
+                savedMessage = null,
+            )
+        }
+    }
+
+    fun saveMimoVoiceDesignPreset() {
+        _uiState.update { state ->
+            val description = state.voiceDraft.trim()
+            if (description.isBlank()) {
+                return@update state.copy(savedMessage = "请先填写音色描述")
+            }
+
+            val now = System.currentTimeMillis()
+            val selectedId = state.mimoSelectedVoiceDesignPresetIdDraft
+            val name = state.mimoVoiceDesignPresetNameDraft.trim().ifBlank { "角色声音" }
+            var matched = false
+            val updatedPresets = state.mimoVoiceDesignPresetsDraft.map { preset ->
+                if (preset.id == selectedId) {
+                    matched = true
+                    preset.copy(name = name, description = description, updatedAt = now)
+                } else {
+                    preset
+                }
+            }.toMutableList()
+            val nextId = if (matched && selectedId != null) {
+                selectedId
+            } else {
+                val preset = MimoVoiceDesignPreset(
+                    id = UUID.randomUUID().toString(),
+                    name = name,
+                    description = description,
+                    createdAt = now,
+                    updatedAt = now,
+                )
+                updatedPresets += preset
+                preset.id
+            }
+
+            state.copy(
+                mimoVoiceDesignPresetsDraft = updatedPresets.distinctBy { it.id },
+                mimoSelectedVoiceDesignPresetIdDraft = nextId,
+                mimoVoiceDesignPresetNameDraft = name,
+                voiceDraft = description,
+                savedMessage = "角色声音已暂存，请保存配置",
+            )
+        }
+    }
+
+    fun deleteMimoVoiceDesignPreset() {
+        _uiState.update { state ->
+            val selectedId = state.mimoSelectedVoiceDesignPresetIdDraft
+            val remaining = state.mimoVoiceDesignPresetsDraft.filterNot { it.id == selectedId }
+            if (selectedId == null || remaining.isEmpty()) {
+                return@update state.copy(savedMessage = "至少保留一个角色声音")
+            }
+            val next = remaining.first()
+            state.copy(
+                mimoVoiceDesignPresetsDraft = remaining,
+                mimoSelectedVoiceDesignPresetIdDraft = next.id,
+                mimoVoiceDesignPresetNameDraft = next.name,
+                voiceDraft = next.description,
+                savedMessage = "角色声音已删除，请保存配置",
+            )
+        }
+    }
 
     fun optimizeMimoVoiceDesignPrompt() {
         val state = uiState.value
@@ -287,11 +397,18 @@ class ProviderSettingsViewModel(
             }
 
             state.isMimo -> {
+                val voiceDesignPresets = normalizedMimoVoiceDesignPresets(state)
+                val selectedVoiceDesignPresetId = state.mimoSelectedVoiceDesignPresetIdDraft
+                    ?.takeIf { id -> voiceDesignPresets.any { it.id == id } }
+                    ?: voiceDesignPresets.firstOrNull()?.id
                 PhraseVoiceJson.encode(
                     MimoSettings(
                         optimizeTextPreview = state.mimoOptimizeTextPreviewDraft,
                         promptOptimizerModel = state.mimoPromptOptimizerModelDraft
                             .ifBlank { MimoTtsCatalog.DEFAULT_PROMPT_OPTIMIZER_MODEL_ID },
+                        useStreaming = state.mimoUseStreamingDraft,
+                        selectedVoiceDesignPresetId = selectedVoiceDesignPresetId,
+                        voiceDesignPresets = voiceDesignPresets,
                     ),
                 )
             }
@@ -319,7 +436,7 @@ class ProviderSettingsViewModel(
         val customSettings = PhraseVoiceJson.decode(config.extraJson, CustomHttpSettings())
         val mimoSettings = PhraseVoiceJson.decode(config.extraJson, MimoSettings())
         val modelDraft = config.model.orEmpty()
-        val voiceDraft = if (
+        val legacyVoiceDraft = if (
             config.providerId == ProviderConfigRepository.MIMO &&
             MimoTtsCatalog.isVoiceDesignModel(modelDraft) &&
             MimoTtsCatalog.isPresetVoice(config.defaultVoice)
@@ -327,6 +444,18 @@ class ProviderSettingsViewModel(
             MimoTtsCatalog.DEFAULT_VOICE_DESIGN_PROMPT
         } else {
             config.defaultVoice.orEmpty()
+        }
+        val mimoVoiceDesignPresets = seededMimoVoiceDesignPresets(config, modelDraft, mimoSettings, legacyVoiceDraft)
+        val selectedMimoVoiceDesignPreset = mimoVoiceDesignPresets
+            .firstOrNull { it.id == mimoSettings.selectedVoiceDesignPresetId }
+            ?: mimoVoiceDesignPresets.firstOrNull()
+        val voiceDraft = if (
+            config.providerId == ProviderConfigRepository.MIMO &&
+            MimoTtsCatalog.isVoiceDesignModel(modelDraft)
+        ) {
+            selectedMimoVoiceDesignPreset?.description ?: legacyVoiceDraft
+        } else {
+            legacyVoiceDraft
         }
         return copy(
             selectedProviderId = config.providerId,
@@ -344,12 +473,97 @@ class ProviderSettingsViewModel(
             mimoOptimizeTextPreviewDraft = mimoSettings.optimizeTextPreview,
             mimoPromptOptimizerModelDraft = mimoSettings.promptOptimizerModel
                 .ifBlank { MimoTtsCatalog.DEFAULT_PROMPT_OPTIMIZER_MODEL_ID },
+            mimoUseStreamingDraft = mimoSettings.useStreaming,
+            mimoVoiceDesignPresetsDraft = mimoVoiceDesignPresets,
+            mimoSelectedVoiceDesignPresetIdDraft = selectedMimoVoiceDesignPreset?.id,
+            mimoVoiceDesignPresetNameDraft = selectedMimoVoiceDesignPreset?.name.orEmpty(),
             isOptimizingVoiceDesign = false,
+        )
+    }
+
+    private fun ProviderSettingsUiState.ensureMimoVoiceDesignDrafts(): ProviderSettingsUiState {
+        if (!isMimoVoiceDesign || mimoVoiceDesignPresetsDraft.isNotEmpty()) return this
+        val now = System.currentTimeMillis()
+        val description = voiceDraft.takeIf { it.isNotBlank() } ?: MimoTtsCatalog.DEFAULT_VOICE_DESIGN_PROMPT
+        val preset = MimoVoiceDesignPreset(
+            id = DEFAULT_MIMO_VOICE_DESIGN_PRESET_ID,
+            name = "默认角色",
+            description = description,
+            createdAt = now,
+            updatedAt = now,
+        )
+        return copy(
+            voiceDraft = description,
+            mimoVoiceDesignPresetsDraft = listOf(preset),
+            mimoSelectedVoiceDesignPresetIdDraft = preset.id,
+            mimoVoiceDesignPresetNameDraft = preset.name,
+        )
+    }
+
+    private fun normalizedMimoVoiceDesignPresets(state: ProviderSettingsUiState): List<MimoVoiceDesignPreset> {
+        val now = System.currentTimeMillis()
+        val existing = state.mimoVoiceDesignPresetsDraft
+            .filter { it.id.isNotBlank() && it.description.isNotBlank() }
+            .distinctBy { it.id }
+            .toMutableList()
+
+        if (!state.isMimoVoiceDesign) return existing
+
+        val description = state.voiceDraft.trim()
+        if (description.isBlank()) return existing
+
+        val selectedId = state.mimoSelectedVoiceDesignPresetIdDraft
+            ?: existing.firstOrNull()?.id
+            ?: DEFAULT_MIMO_VOICE_DESIGN_PRESET_ID
+        val name = state.mimoVoiceDesignPresetNameDraft.trim().ifBlank { "默认角色" }
+        val index = existing.indexOfFirst { it.id == selectedId }
+        if (index >= 0) {
+            existing[index] = existing[index].copy(
+                name = name,
+                description = description,
+                updatedAt = now,
+            )
+        } else {
+            existing += MimoVoiceDesignPreset(
+                id = selectedId,
+                name = name,
+                description = description,
+                createdAt = now,
+                updatedAt = now,
+            )
+        }
+        return existing
+    }
+
+    private fun seededMimoVoiceDesignPresets(
+        config: ProviderConfig,
+        modelDraft: String,
+        settings: MimoSettings,
+        legacyVoiceDraft: String,
+    ): List<MimoVoiceDesignPreset> {
+        val presets = settings.voiceDesignPresets
+            .filter { it.id.isNotBlank() && it.description.isNotBlank() }
+            .distinctBy { it.id }
+        if (presets.isNotEmpty()) return presets
+        if (config.providerId != ProviderConfigRepository.MIMO || !MimoTtsCatalog.isVoiceDesignModel(modelDraft)) {
+            return emptyList()
+        }
+
+        val now = System.currentTimeMillis()
+        return listOf(
+            MimoVoiceDesignPreset(
+                id = DEFAULT_MIMO_VOICE_DESIGN_PRESET_ID,
+                name = "默认角色",
+                description = legacyVoiceDraft.ifBlank { MimoTtsCatalog.DEFAULT_VOICE_DESIGN_PROMPT },
+                createdAt = now,
+                updatedAt = now,
+            ),
         )
     }
 
     companion object {
         private const val TAG = "ProviderSettings"
         private const val TEST_TEXT = "你好，这是 PhraseVoice 的语音试听。"
+        private const val DEFAULT_MIMO_VOICE_DESIGN_PRESET_ID = "default"
     }
 }

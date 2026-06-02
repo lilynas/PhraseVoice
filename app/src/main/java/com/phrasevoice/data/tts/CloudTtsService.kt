@@ -266,6 +266,7 @@ class CloudTtsService(
         val settings = PhraseVoiceJson.decode(config.extraJson, MimoSettings())
         val target = audioFileStore.createTarget(AudioFormat.WAV, cache = cache)
         val voiceDesign = MimoTtsCatalog.isVoiceDesignModel(model)
+        val responseFormat = if (settings.useStreaming) "pcm16" else AudioFormat.WAV.extension
         val voiceOrDescription = request.voiceId ?: config.defaultVoice
         val userInstruction = if (voiceDesign) {
             voiceOrDescription?.takeIf { it.isNotBlank() }
@@ -296,14 +297,14 @@ class CloudTtsService(
         val audio = if (voiceDesign) {
             JsonObject(
                 mapOf(
-                    "format" to JsonPrimitive(AudioFormat.WAV.extension),
+                    "format" to JsonPrimitive(responseFormat),
                     "optimize_text_preview" to JsonPrimitive(settings.optimizeTextPreview),
                 ),
             )
         } else {
             JsonObject(
                 mapOf(
-                    "format" to JsonPrimitive(AudioFormat.WAV.extension),
+                    "format" to JsonPrimitive(responseFormat),
                     "voice" to JsonPrimitive(
                         voiceOrDescription?.takeIf { it.isNotBlank() } ?: MimoTtsCatalog.DEFAULT_VOICE_ID,
                     ),
@@ -311,13 +312,19 @@ class CloudTtsService(
             )
         }
         val body = JsonObject(
-            mapOf(
-                "model" to JsonPrimitive(model),
-                "messages" to JsonArray(messages),
-                "audio" to audio,
-            ),
+            buildMap {
+                put("model", JsonPrimitive(model))
+                put("messages", JsonArray(messages))
+                put("audio", audio)
+                if (settings.useStreaming) {
+                    put("stream", JsonPrimitive(true))
+                }
+            },
         ).toString()
-        AppLogger.i(TAG, "mimo request url=${endpoint.toString().safeUrlForLog()} model=$model voiceDesign=$voiceDesign")
+        AppLogger.i(
+            TAG,
+            "mimo request url=${endpoint.toString().safeUrlForLog()} model=$model voiceDesign=$voiceDesign stream=${settings.useStreaming}",
+        )
         val httpRequest = Request.Builder()
             .url(endpoint)
             .addHeader("api-key", apiKey)
@@ -325,7 +332,11 @@ class CloudTtsService(
             .post(body.toRequestBody(JSON_MEDIA_TYPE))
             .build()
 
-        return executeMimoAudioRequest(httpRequest, target.file, target.uri, target.mimeType)
+        return if (settings.useStreaming) {
+            executeMimoStreamingAudioRequest(httpRequest, target.file, target.uri, target.mimeType)
+        } else {
+            executeMimoAudioRequest(httpRequest, target.file, target.uri, target.mimeType)
+        }
     }
 
     private fun synthesizeCustomHttp(
@@ -508,6 +519,27 @@ class CloudTtsService(
         }.getOrElse { throwable ->
             AppLogger.e(TAG, "mimo request failed url=${request.url.toString().safeUrlForLog()}", throwable)
             TtsResult.Error("解析 MiMo 音频响应失败：${throwable.message ?: "未知错误"}", throwable)
+        }
+
+    private fun executeMimoStreamingAudioRequest(
+        request: Request,
+        file: File,
+        uri: Uri,
+        mimeType: String,
+    ): TtsResult =
+        runCatching {
+            httpClient.newCall(request).execute().use { response ->
+                AppLogger.i(TAG, "mimo stream response code=${response.code} url=${request.url.toString().safeUrlForLog()}")
+                if (!response.isSuccessful) return response.toTtsError()
+                val stream = response.body?.string() ?: return TtsResult.Error("MiMo 没有返回流式响应。")
+                val pcmBytes = MimoTtsResponseParser.parseStreamPcm(stream)
+                PcmWavWriter.writeWav(file, pcmBytes)
+                AppLogger.i(TAG, "mimo stream wav saved pcmBytes=${pcmBytes.size} bytes=${file.length()} uri=$uri")
+                TtsResult.AudioFile(uri = uri, mimeType = mimeType)
+            }
+        }.getOrElse { throwable ->
+            AppLogger.e(TAG, "mimo stream request failed url=${request.url.toString().safeUrlForLog()}", throwable)
+            TtsResult.Error("解析 MiMo 流式音频响应失败：${throwable.message ?: "未知错误"}", throwable)
         }
 
     private fun findJsonString(json: String, path: String): String? {

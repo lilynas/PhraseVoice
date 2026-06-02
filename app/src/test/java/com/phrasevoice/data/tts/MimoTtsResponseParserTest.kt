@@ -55,4 +55,30 @@ class MimoTtsResponseParserTest {
             MimoTtsResponseParser.parseAudio(json)
         }
     }
+
+    @Test
+    fun parseStreamPcm_concatenatesDeltaAudioChunks() {
+        val stream = """
+            data: {"choices":[{"delta":{"audio":{"data":"AQI="}}}]}
+            data: {"choices":[{"delta":{"content":"ignored"}}]}
+            data: {"choices":[{"delta":{"audio":{"data":"AwQ="}}}]}
+            data: [DONE]
+        """.trimIndent()
+
+        val pcm = MimoTtsResponseParser.parseStreamPcm(stream)
+
+        assertArrayEquals(byteArrayOf(1, 2, 3, 4), pcm)
+    }
+
+    @Test
+    fun parseStreamPcm_throwsWhenAudioMissing() {
+        val stream = """
+            data: {"choices":[{"delta":{"content":"ignored"}}]}
+            data: [DONE]
+        """.trimIndent()
+
+        assertThrows(IllegalArgumentException::class.java) {
+            MimoTtsResponseParser.parseStreamPcm(stream)
+        }
+    }
 }

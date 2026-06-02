@@ -3,6 +3,9 @@ package com.phrasevoice.ui.home
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.phrasevoice.data.local.AudioFileStore
+import com.phrasevoice.data.local.PhraseVoiceJson
+import com.phrasevoice.data.model.MimoSettings
+import com.phrasevoice.data.model.MimoVoiceDesignPreset
 import com.phrasevoice.data.model.ProviderConfig
 import com.phrasevoice.data.model.Phrase
 import com.phrasevoice.data.repository.HistoryRepository
@@ -545,18 +548,35 @@ class HomeViewModel(
         val providerId = ProviderConfigRepository.MIMO
         val config = providerConfigs.firstOrNull { it.providerId == providerId }
         if (MimoTtsCatalog.isVoiceDesignModel(config?.model)) {
+            val settings = PhraseVoiceJson.decode(config?.extraJson, MimoSettings())
             val description = config?.defaultVoice
                 ?.takeIf { it.isNotBlank() }
                 ?: MimoTtsCatalog.DEFAULT_VOICE_DESIGN_PROMPT
-            return listOf(
-                TtsVoice(
-                    id = description,
-                    name = "VoiceDesign 角色声音",
-                    language = null,
-                    description = description,
-                    providerId = providerId,
-                ),
+            val fallbackPreset = MimoVoiceDesignPreset(
+                id = "default",
+                name = "默认角色",
+                description = description,
             )
+            val presets = settings.voiceDesignPresets
+                .filter { it.description.isNotBlank() }
+                .ifEmpty { listOf(fallbackPreset) }
+            val selected = presets.firstOrNull { it.id == settings.selectedVoiceDesignPresetId }
+            val orderedPresets = if (selected == null) {
+                presets
+            } else {
+                listOf(selected) + presets.filterNot { it.id == selected.id }
+            }
+            return orderedPresets
+                .distinctBy { it.description }
+                .map { preset ->
+                    TtsVoice(
+                        id = preset.description,
+                        name = preset.name.ifBlank { "VoiceDesign 角色声音" },
+                        language = null,
+                        description = preset.description,
+                        providerId = providerId,
+                    )
+                }
         }
         val configured = config?.defaultVoice
         val defaults = MimoTtsCatalog.presetVoices.map { voice ->
