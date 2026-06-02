@@ -1,6 +1,11 @@
 package com.phrasevoice.ui
 
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Build
+import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.List
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.outlined.Build
 import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.Home
@@ -36,13 +41,14 @@ import com.phrasevoice.ui.settings.SettingsViewModel
 
 private enum class Destination(
     val label: String,
-    val icon: ImageVector,
+    val selectedIcon: ImageVector,
+    val unselectedIcon: ImageVector,
 ) {
-    Home("朗读", Icons.Outlined.Home),
-    Library("常用语", Icons.Outlined.List),
-    History("历史", Icons.Outlined.History),
-    Providers("Provider", Icons.Outlined.Build),
-    Settings("设置", Icons.Outlined.Settings),
+    Home("朗读", Icons.Filled.Home, Icons.Outlined.Home),
+    Library("常用语", Icons.Filled.List, Icons.Outlined.List),
+    History("历史", Icons.Filled.History, Icons.Outlined.History),
+    Providers("Provider", Icons.Filled.Build, Icons.Outlined.Build),
+    Settings("设置", Icons.Filled.Settings, Icons.Outlined.Settings),
 }
 
 @Composable
@@ -60,10 +66,16 @@ fun PhraseVoiceRoot(container: AppContainer) {
         bottomBar = {
             NavigationBar {
                 Destination.entries.forEach { item ->
+                    val isSelected = destination == item
                     NavigationBarItem(
-                        selected = destination == item,
+                        selected = isSelected,
                         onClick = { destination = item },
-                        icon = { Icon(item.icon, contentDescription = item.label) },
+                        icon = {
+                            Icon(
+                                imageVector = if (isSelected) item.selectedIcon else item.unselectedIcon,
+                                contentDescription = item.label
+                            )
+                        },
                         label = { Text(item.label) },
                     )
                 }

@@ -1,11 +1,14 @@
 package com.phrasevoice.ui.theme
 
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Shapes
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.dp
 
 private val LightColors = lightColorScheme(
     primary = Color(0xFF0F766E),
@@ -29,6 +32,14 @@ private val DarkColors = darkColorScheme(
     surface = Color(0xFF111827),
 )
 
+private val ExpressiveShapes = Shapes(
+    extraSmall = RoundedCornerShape(8.dp),
+    small = RoundedCornerShape(12.dp),
+    medium = RoundedCornerShape(20.dp),  // M3 Expressive card style
+    large = RoundedCornerShape(28.dp),   // Dialogs, popups
+    extraLarge = RoundedCornerShape(36.dp)
+)
+
 @Composable
 fun PhraseVoiceTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
@@ -36,6 +47,7 @@ fun PhraseVoiceTheme(
 ) {
     MaterialTheme(
         colorScheme = if (darkTheme) DarkColors else LightColors,
+        shapes = ExpressiveShapes,
         typography = MaterialTheme.typography,
         content = content,
     )
