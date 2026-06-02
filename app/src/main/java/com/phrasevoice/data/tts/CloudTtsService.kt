@@ -34,14 +34,15 @@ class CloudTtsService(
     suspend fun synthesize(
         request: TtsRequest,
         runtimeConfig: RuntimeProviderConfig,
+        cache: Boolean = false,
     ): TtsResult = withContext(Dispatchers.IO) {
         AppLogger.i(
             TAG,
             "cloud synthesize provider=${runtimeConfig.config.providerId} model=${runtimeConfig.config.model.orEmpty()} voice=${request.voiceId.orEmpty()} length=${request.text.length}",
         )
         when (runtimeConfig.config.providerId) {
-            ProviderConfigRepository.OPENAI -> synthesizeOpenAiCompatible(request, runtimeConfig)
-            ProviderConfigRepository.CUSTOM_HTTP -> synthesizeCustomHttp(request, runtimeConfig)
+            ProviderConfigRepository.OPENAI -> synthesizeOpenAiCompatible(request, runtimeConfig, cache)
+            ProviderConfigRepository.CUSTOM_HTTP -> synthesizeCustomHttp(request, runtimeConfig, cache)
             else -> TtsResult.Error("该 Provider 暂未接入。")
         }
     }
@@ -49,6 +50,7 @@ class CloudTtsService(
     private fun synthesizeOpenAiCompatible(
         request: TtsRequest,
         runtimeConfig: RuntimeProviderConfig,
+        cache: Boolean,
     ): TtsResult {
         val apiKey = runtimeConfig.apiKey
         if (apiKey.isNullOrBlank()) return TtsResult.Error("请先在 Provider 页面保存 API Key。")
@@ -56,7 +58,7 @@ class CloudTtsService(
             ?: return TtsResult.Error("请先配置 OpenAI-compatible Base URL。")
         AppLogger.i(TAG, "openai request url=${baseUrl.safeUrlForLog()}")
         val format = AudioFormat.MP3
-        val target = audioFileStore.createTarget(format)
+        val target = audioFileStore.createTarget(format, cache = cache)
         val body = JsonObject(
             buildMap {
                 put("model", JsonPrimitive(runtimeConfig.config.model ?: "gpt-4o-mini-tts"))
@@ -82,6 +84,7 @@ class CloudTtsService(
     private fun synthesizeCustomHttp(
         request: TtsRequest,
         runtimeConfig: RuntimeProviderConfig,
+        cache: Boolean,
     ): TtsResult {
         val config = runtimeConfig.config
         val baseUrl = config.baseUrl?.takeIf { it.isNotBlank() }
@@ -92,7 +95,7 @@ class CloudTtsService(
             CustomHttpSettings(),
         )
         val format = request.outputFormat
-        val target = audioFileStore.createTarget(format)
+        val target = audioFileStore.createTarget(format, cache = cache)
         val variables = mapOf(
             "apiKey" to runtimeConfig.apiKey.orEmpty(),
             "text" to request.text,

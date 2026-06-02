@@ -17,11 +17,13 @@ import com.phrasevoice.domain.model.AudioFormat
 import com.phrasevoice.domain.tts.TtsRequest
 import com.phrasevoice.domain.tts.TtsResult
 import com.phrasevoice.domain.tts.TtsVoice
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 enum class HomeStatus {
     Idle,
@@ -51,6 +53,7 @@ data class HomeUiState(
     val errorMessage: String? = null,
     val quickPhrases: List<Phrase> = emptyList(),
     val lastAudioUri: String? = null,
+    val lastAudioMimeType: String? = null,
     val androidTtsReady: Boolean = true,
     val androidTtsMessage: String? = null,
 )
@@ -154,7 +157,15 @@ class HomeViewModel(
     }
 
     fun updateText(value: String) {
-        _uiState.update { it.copy(text = value, errorMessage = null, status = HomeStatus.Idle) }
+        _uiState.update {
+            it.copy(
+                text = value,
+                errorMessage = null,
+                status = HomeStatus.Idle,
+                lastAudioUri = null,
+                lastAudioMimeType = null,
+            )
+        }
     }
 
     fun selectProvider(providerId: String) {
@@ -167,6 +178,8 @@ class HomeViewModel(
                 selectedProviderId = providerId,
                 voices = voices,
                 selectedVoiceId = voices.firstOrNull()?.id,
+                lastAudioUri = null,
+                lastAudioMimeType = null,
                 status = when {
                     androidUnavailable -> HomeStatus.Error
                     option.enabled -> HomeStatus.Idle
@@ -182,7 +195,13 @@ class HomeViewModel(
     }
 
     fun selectVoice(voiceId: String?) {
-        _uiState.update { it.copy(selectedVoiceId = voiceId) }
+        _uiState.update {
+            it.copy(
+                selectedVoiceId = voiceId,
+                lastAudioUri = null,
+                lastAudioMimeType = null,
+            )
+        }
     }
 
     fun updateSpeed(value: Float) {
@@ -235,7 +254,14 @@ class HomeViewModel(
                         )
                     }
                     AppLogger.i(TAG, "speak local playback started provider=${request.providerId}")
-                    _uiState.update { it.copy(status = HomeStatus.Playing, errorMessage = null) }
+                    _uiState.update {
+                        it.copy(
+                            status = HomeStatus.Playing,
+                            errorMessage = null,
+                            lastAudioUri = null,
+                            lastAudioMimeType = null,
+                        )
+                    }
                 }
 
                 is TtsResult.AudioFile -> {
@@ -252,6 +278,7 @@ class HomeViewModel(
                         it.copy(
                             status = HomeStatus.Playing,
                             lastAudioUri = result.uri.toString(),
+                            lastAudioMimeType = result.mimeType,
                             errorMessage = null,
                         )
                     }
@@ -301,6 +328,7 @@ class HomeViewModel(
                         it.copy(
                             status = HomeStatus.Idle,
                             lastAudioUri = result.uri.toString(),
+                            lastAudioMimeType = result.mimeType,
                             errorMessage = null,
                         )
                     }
@@ -350,7 +378,17 @@ class HomeViewModel(
 
             ProviderConfigRepository.OPENAI,
             ProviderConfigRepository.CUSTOM_HTTP -> {
-                val result = cloudTtsService.synthesize(request, runtimeConfig)
+                val settings = settingsRepository.currentSettings()
+                if (playAudioFile && !settings.keepAudioCache) {
+                    withContext(Dispatchers.IO) {
+                        audioFileStore.clearCache()
+                    }
+                }
+                val result = cloudTtsService.synthesize(
+                    request = request,
+                    runtimeConfig = runtimeConfig,
+                    cache = playAudioFile,
+                )
                 if (playAudioFile && result is TtsResult.AudioFile) {
                     audioPlaybackController.play(result.uri)
                 }

@@ -37,6 +37,8 @@ class AppViewModelFactory(
 
             modelClass.isAssignableFrom(SettingsViewModel::class.java) -> SettingsViewModel(
                 settingsRepository = container.settingsRepository,
+                providerConfigRepository = container.providerConfigRepository,
+                audioFileStore = container.audioFileStore,
             )
 
             modelClass.isAssignableFrom(ProviderSettingsViewModel::class.java) -> ProviderSettingsViewModel(

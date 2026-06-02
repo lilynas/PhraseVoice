@@ -1,5 +1,8 @@
 package com.phrasevoice.ui.home
 
+import android.content.Context
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -15,6 +18,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Download
 import androidx.compose.material.icons.outlined.PlayArrow
+import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material.icons.outlined.Stop
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
@@ -38,6 +42,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.phrasevoice.data.model.Phrase
@@ -58,6 +63,7 @@ fun HomeScreen(
     onQuickPhraseClick: (Phrase) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val context = LocalContext.current
     val androidTtsUnavailable = state.selectedProviderId == "android_system" && !state.androidTtsReady
     val canRunTts = state.status != HomeStatus.Loading &&
         state.status != HomeStatus.Saving &&
@@ -121,6 +127,21 @@ fun HomeScreen(
                 ) {
                     Icon(Icons.Outlined.Download, contentDescription = null)
                     Text(if (state.status == HomeStatus.Saving) "保存中" else "保存")
+                }
+            }
+            if (!state.lastAudioUri.isNullOrBlank()) {
+                OutlinedButton(
+                    onClick = {
+                        shareAudio(
+                            context = context,
+                            uriString = state.lastAudioUri,
+                            mimeType = state.lastAudioMimeType,
+                        )
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Icon(Icons.Outlined.Share, contentDescription = null)
+                    Text("分享音频")
                 }
             }
         }
@@ -278,7 +299,7 @@ private fun StatusPanel(state: HomeUiState) {
             if (!state.lastAudioUri.isNullOrBlank()) {
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
-                    text = "音频已保存",
+                    text = "音频已生成，可分享",
                     style = MaterialTheme.typography.bodyMedium,
                 )
             }
@@ -294,3 +315,17 @@ private fun statusLabel(status: HomeStatus): String =
         HomeStatus.Saving -> "保存中"
         HomeStatus.Error -> "出错"
     }
+
+private fun shareAudio(
+    context: Context,
+    uriString: String,
+    mimeType: String?,
+) {
+    val uri = Uri.parse(uriString)
+    val shareIntent = Intent(Intent.ACTION_SEND).apply {
+        type = mimeType ?: "audio/*"
+        putExtra(Intent.EXTRA_STREAM, uri)
+        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+    }
+    context.startActivity(Intent.createChooser(shareIntent, "分享音频"))
+}

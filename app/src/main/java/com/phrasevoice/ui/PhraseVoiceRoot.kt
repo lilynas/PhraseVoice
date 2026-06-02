@@ -135,12 +135,15 @@ fun PhraseVoiceRoot(container: AppContainer) {
 
             Destination.Settings -> SettingsScreen(
                 state = settingsViewModel.uiState.collectAsStateWithLifecycle().value,
+                onDefaultProviderChange = settingsViewModel::updateDefaultProvider,
                 onSpeedChange = settingsViewModel::updateDefaultSpeed,
                 onPitchChange = settingsViewModel::updateDefaultPitch,
                 onVolumeChange = settingsViewModel::updateDefaultVolume,
                 onAutoSaveHistoryChange = settingsViewModel::updateAutoSaveHistory,
                 onKeepAudioCacheChange = settingsViewModel::updateKeepAudioCache,
+                onClearAudioCache = settingsViewModel::clearAudioCache,
                 onClearDebugLogs = settingsViewModel::clearDebugLogs,
+                onRefreshAudioCache = settingsViewModel::refreshAudioCacheInfo,
                 modifier = modifier,
             )
         }
