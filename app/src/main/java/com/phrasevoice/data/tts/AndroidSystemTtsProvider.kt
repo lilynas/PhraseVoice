@@ -1,22 +1,25 @@
 package com.phrasevoice.data.tts
 
 import android.content.Context
+import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
 import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
+import com.phrasevoice.debug.AppLogger
 import com.phrasevoice.domain.model.AudioFormat
 import com.phrasevoice.domain.tts.TtsProvider
 import com.phrasevoice.domain.tts.TtsRequest
 import com.phrasevoice.domain.tts.TtsResult
 import com.phrasevoice.domain.tts.TtsVoice
-import com.phrasevoice.debug.AppLogger
 import java.io.File
 import java.util.Locale
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 
@@ -39,93 +42,89 @@ class AndroidSystemTtsProvider(
     override val supportsDirectPlayback: Boolean = true
     override val supportsFileOutput: Boolean = true
 
-    private val initStatus = CompletableDeferred<Int>()
+    private val appContext = context.applicationContext
+    private val initializationMutex = Mutex()
     private val fileRequests = ConcurrentHashMap<String, PendingFileRequest>()
-    private val textToSpeech = TextToSpeech(context.applicationContext) { status ->
-        if (!initStatus.isCompleted) initStatus.complete(status)
+    private var activeTts: TtsHandle? = null
+    private val utteranceProgressListener = object : UtteranceProgressListener() {
+        override fun onStart(utteranceId: String?) = Unit
+
+        override fun onDone(utteranceId: String?) {
+            val pending = utteranceId?.let(fileRequests::remove) ?: return
+            pending.deferred.complete(
+                TtsResult.AudioFile(uri = pending.uri, mimeType = pending.mimeType),
+            )
+        }
+
+        @Deprecated("Deprecated in Android framework")
+        override fun onError(utteranceId: String?) {
+            completeWithError(utteranceId, "Android TTS failed while generating audio.")
+        }
+
+        override fun onError(utteranceId: String?, errorCode: Int) {
+            completeWithError(
+                utteranceId,
+                "Android TTS failed while generating audio. Code: $errorCode",
+            )
+        }
     }
 
-    init {
-        textToSpeech.setOnUtteranceProgressListener(
-            object : UtteranceProgressListener() {
-                override fun onStart(utteranceId: String?) = Unit
+    override suspend fun listVoices(): List<TtsVoice> {
+        if (!readiness().ready) return defaultVoice()
 
-                override fun onDone(utteranceId: String?) {
-                    val pending = utteranceId?.let(fileRequests::remove) ?: return
-                    pending.deferred.complete(
-                        TtsResult.AudioFile(uri = pending.uri, mimeType = pending.mimeType),
+        return withContext(Dispatchers.Main) {
+            val voices = activeTts?.textToSpeech?.voices.orEmpty()
+            if (voices.isEmpty()) return@withContext defaultVoice()
+
+            val engineVoices = voices
+                .sortedWith(compareBy({ it.locale?.toLanguageTag().orEmpty() }, { it.name }))
+                .map { voice ->
+                    TtsVoice(
+                        id = voice.name,
+                        name = voice.name,
+                        language = voice.locale?.toLanguageTag(),
+                        description = if (voice.isNetworkConnectionRequired) {
+                            "Network voice"
+                        } else {
+                            "System voice"
+                        },
+                        providerId = id,
                     )
                 }
-
-                @Deprecated("Deprecated in Android framework")
-                override fun onError(utteranceId: String?) {
-                    completeWithError(utteranceId, "Android TTS failed while generating audio.")
-                }
-
-                override fun onError(utteranceId: String?, errorCode: Int) {
-                    completeWithError(
-                        utteranceId,
-                        "Android TTS failed while generating audio. Code: $errorCode",
-                    )
-                }
-            },
-        )
+            defaultVoice() + engineVoices
+        }
     }
 
-    override suspend fun listVoices(): List<TtsVoice> = withContext(Dispatchers.Main) {
-        if (!readiness().ready) return@withContext defaultVoice()
+    fun listEngines(): List<AndroidTtsEngine> {
+        val packageManager = appContext.packageManager
+        val services = runCatching {
+            @Suppress("DEPRECATION")
+            packageManager.queryIntentServices(
+                Intent(TextToSpeech.Engine.INTENT_ACTION_TTS_SERVICE),
+                0,
+            )
+        }.getOrDefault(emptyList())
 
-        val voices = textToSpeech.voices.orEmpty()
-        if (voices.isEmpty()) return@withContext defaultVoice()
+        val visibleEngines = services.mapNotNull { resolveInfo ->
+            val serviceInfo = resolveInfo.serviceInfo ?: return@mapNotNull null
+            AndroidTtsEngine(
+                name = serviceInfo.packageName,
+                label = resolveInfo.loadLabel(packageManager)?.toString() ?: serviceInfo.packageName,
+            )
+        }.distinctBy { it.name }
+        if (visibleEngines.isNotEmpty()) return visibleEngines
 
-        val engineVoices = voices
-            .sortedWith(compareBy({ it.locale?.toLanguageTag().orEmpty() }, { it.name }))
-            .map { voice ->
-                TtsVoice(
-                    id = voice.name,
-                    name = voice.name,
-                    language = voice.locale?.toLanguageTag(),
-                    description = if (voice.isNetworkConnectionRequired) {
-                        "Network voice"
-                    } else {
-                        "System voice"
-                    },
-                    providerId = id,
-                )
-            }
-        defaultVoice() + engineVoices
-    }
-
-    fun listEngines(): List<AndroidTtsEngine> =
-        textToSpeech.engines.orEmpty().map { engine ->
+        return activeTts?.textToSpeech?.engines.orEmpty().map { engine ->
             AndroidTtsEngine(name = engine.name, label = engine.label)
         }
+    }
 
-    suspend fun readiness(): AndroidTtsReadiness = withContext(Dispatchers.Main) {
-        val engines = listEngines()
-        when (val status = withTimeoutOrNull(INIT_TIMEOUT_MS) { initStatus.await() }) {
-            TextToSpeech.SUCCESS -> {
-                AppLogger.i(TAG, "readiness ready engines=${engines.map { it.name }}")
-                AndroidTtsReadiness(ready = true, engines = engines)
-            }
-            null -> {
-                AppLogger.w(TAG, "readiness timeout engines=${engines.map { it.name }}")
-                AndroidTtsReadiness(
-                    ready = false,
-                    message = "Android 系统 TTS 初始化超时。请检查系统语音服务是否可用，或切换到 OpenAI/Custom HTTP。",
-                    engines = engines,
-                )
-            }
-            else -> {
-                AppLogger.w(TAG, "readiness failed status=$status engines=${engines.map { it.name }}")
-                AndroidTtsReadiness(
-                    ready = false,
-                    message = "Android 系统 TTS 初始化失败（状态 $status）。请检查系统语音服务是否可用，或切换到 OpenAI/Custom HTTP。",
-                    engines = engines,
-                )
+    suspend fun readiness(): AndroidTtsReadiness =
+        initializationMutex.withLock {
+            withContext(Dispatchers.Main) {
+                ensureReadyLocked()
             }
         }
-    }
 
     override suspend fun synthesize(request: TtsRequest): TtsResult = withContext(Dispatchers.Main) {
         val readiness = readiness()
@@ -133,7 +132,9 @@ class AndroidSystemTtsProvider(
             return@withContext TtsResult.Error(readiness.message ?: "Android 系统 TTS 暂不可用。")
         }
 
-        applyRequestOptions(request)
+        val textToSpeech = activeTts?.textToSpeech
+            ?: return@withContext TtsResult.Error(readiness.message ?: "Android 系统 TTS 暂不可用。")
+        applyRequestOptions(textToSpeech, request)
         val utteranceId = UUID.randomUUID().toString()
         AppLogger.i(TAG, "speak request voice=${request.voiceId.orEmpty()} language=${request.language.orEmpty()} length=${request.text.length}")
         val result = textToSpeech.speak(
@@ -165,13 +166,15 @@ class AndroidSystemTtsProvider(
         if (request.outputFormat != AudioFormat.WAV) {
             return@withContext TtsResult.Error("Android System TTS currently exports WAV audio.")
         }
+        val textToSpeech = activeTts?.textToSpeech
+            ?: return@withContext TtsResult.Error(readiness.message ?: "Android 系统 TTS 暂不可用。")
 
         file.parentFile?.mkdirs()
         val utteranceId = UUID.randomUUID().toString()
         val deferred = CompletableDeferred<TtsResult>()
         fileRequests[utteranceId] = PendingFileRequest(deferred, uri, mimeType)
 
-        applyRequestOptions(request)
+        applyRequestOptions(textToSpeech, request)
         val result = textToSpeech.synthesizeToFile(
             request.text,
             request.toSpeechBundle(),
@@ -193,10 +196,10 @@ class AndroidSystemTtsProvider(
     }
 
     override fun stop() {
-        textToSpeech.stop()
+        activeTts?.textToSpeech?.stop()
     }
 
-    private fun applyRequestOptions(request: TtsRequest) {
+    private fun applyRequestOptions(textToSpeech: TextToSpeech, request: TtsRequest) {
         textToSpeech.setSpeechRate(request.speed.coerceIn(0.5f, 2.0f))
         textToSpeech.setPitch(request.pitch.coerceIn(0.5f, 2.0f))
 
@@ -210,6 +213,101 @@ class AndroidSystemTtsProvider(
             ?.let { voiceId -> textToSpeech.voices?.firstOrNull { it.name == voiceId } }
         if (matchingVoice != null) {
             textToSpeech.voice = matchingVoice
+        }
+    }
+
+    private suspend fun ensureReadyLocked(): AndroidTtsReadiness {
+        val engines = listEngines()
+        val active = activeTts
+        if (active != null) {
+            val status = withTimeoutOrNull(ENGINE_INIT_TIMEOUT_MS) { active.initStatus.await() }
+            when (status) {
+                TextToSpeech.SUCCESS -> {
+                    AppLogger.i(TAG, "readiness ready engine=${active.label} engines=${engines.map { it.name }}")
+                    return AndroidTtsReadiness(ready = true, engines = engines)
+                }
+                null -> {
+                    AppLogger.w(TAG, "active engine timeout engine=${active.label} engines=${engines.map { it.name }}")
+                    shutdownHandle(active)
+                }
+                else -> {
+                    AppLogger.w(TAG, "active engine failed engine=${active.label} status=$status engines=${engines.map { it.name }}")
+                    shutdownHandle(active)
+                }
+            }
+        }
+
+        val attempted = mutableListOf<String>()
+        engineCandidates(engines).forEach { engineName ->
+            val label = engineName ?: "default"
+            attempted += label
+            AppLogger.i(TAG, "init attempt engine=$label engines=${engines.map { it.name }}")
+            val handle = createTextToSpeech(engineName)
+            val status = withTimeoutOrNull(ENGINE_INIT_TIMEOUT_MS) { handle.initStatus.await() }
+            when (status) {
+                TextToSpeech.SUCCESS -> {
+                    activeTts = handle
+                    AppLogger.i(TAG, "readiness ready engine=$label engines=${engines.map { it.name }}")
+                    return AndroidTtsReadiness(ready = true, engines = engines)
+                }
+                null -> {
+                    AppLogger.w(TAG, "init timeout engine=$label")
+                    shutdownHandle(handle)
+                }
+                else -> {
+                    AppLogger.w(TAG, "init failed engine=$label status=$status")
+                    shutdownHandle(handle)
+                }
+            }
+        }
+
+        AppLogger.w(TAG, "readiness failed attempts=$attempted engines=${engines.map { it.name }}")
+        return AndroidTtsReadiness(
+            ready = false,
+            message = "Android 系统 TTS 初始化失败/超时。已尝试：${attempted.joinToString()}。请在系统设置中确认默认语音引擎可用，或切换到 OpenAI/Custom HTTP。",
+            engines = engines,
+        )
+    }
+
+    private fun createTextToSpeech(engineName: String?): TtsHandle {
+        val initStatus = CompletableDeferred<Int>()
+        val textToSpeech = if (engineName.isNullOrBlank()) {
+            TextToSpeech(appContext) { status ->
+                if (!initStatus.isCompleted) initStatus.complete(status)
+            }
+        } else {
+            TextToSpeech(
+                appContext,
+                { status -> if (!initStatus.isCompleted) initStatus.complete(status) },
+                engineName,
+            )
+        }
+        textToSpeech.setOnUtteranceProgressListener(utteranceProgressListener)
+        return TtsHandle(
+            textToSpeech = textToSpeech,
+            engineName = engineName,
+            initStatus = initStatus,
+        )
+    }
+
+    private fun engineCandidates(engines: List<AndroidTtsEngine>): List<String?> {
+        val preferredEngines = listOf("com.google.android.tts", "com.xiaomi.mibrain.speech")
+        val engineNames = engines
+            .map { it.name }
+            .distinct()
+            .sortedWith(
+                compareBy<String> { name ->
+                    preferredEngines.indexOf(name).takeIf { it >= 0 } ?: Int.MAX_VALUE
+                }.thenBy { it },
+            )
+        return engineNames + listOf(null)
+    }
+
+    private fun shutdownHandle(handle: TtsHandle) {
+        if (activeTts === handle) activeTts = null
+        runCatching {
+            handle.textToSpeech.stop()
+            handle.textToSpeech.shutdown()
         }
     }
 
@@ -239,9 +337,18 @@ class AndroidSystemTtsProvider(
         val mimeType: String,
     )
 
+    private data class TtsHandle(
+        val textToSpeech: TextToSpeech,
+        val engineName: String?,
+        val initStatus: CompletableDeferred<Int>,
+    ) {
+        val label: String
+            get() = engineName ?: "default"
+    }
+
     companion object {
         private const val TAG = "AndroidSystemTts"
-        private const val INIT_TIMEOUT_MS = 10_000L
+        private const val ENGINE_INIT_TIMEOUT_MS = 5_000L
         private const val FILE_SYNTHESIS_TIMEOUT_MS = 60_000L
     }
 }
