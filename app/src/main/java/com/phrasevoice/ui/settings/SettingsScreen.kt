@@ -80,6 +80,8 @@ fun SettingsScreen(
     onKeepAudioCacheChange: (Boolean) -> Unit,
     onClearAudioCache: () -> Unit,
     onClearDebugLogs: () -> Unit,
+    onDebugLoggingEnabledChange: (Boolean) -> Unit,
+    onDebugLogLevelChange: (String) -> Unit,
     onRefreshAudioCache: () -> Unit,
     onThemeModeChange: (String) -> Unit,
     modifier: Modifier = Modifier,
@@ -229,8 +231,12 @@ fun SettingsScreen(
         }
 
         DebugLogCard(
+            enabled = settings.debugLoggingEnabled,
+            level = settings.debugLogLevel,
             logs = state.debugLogs,
             onClearDebugLogs = onClearDebugLogs,
+            onEnabledChange = onDebugLoggingEnabledChange,
+            onLevelChange = onDebugLogLevelChange,
         )
     }
 }
@@ -464,12 +470,33 @@ private fun AudioCacheCard(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun DebugLogCard(
+    enabled: Boolean,
+    level: String,
     logs: List<DebugLogEntry>,
     onClearDebugLogs: () -> Unit,
+    onEnabledChange: (Boolean) -> Unit,
+    onLevelChange: (String) -> Unit,
 ) {
     val timeFormat = remember { SimpleDateFormat("HH:mm:ss", Locale.getDefault()) }
+    val logLevelOptions = listOf(
+        "VERBOSE" to "Verbose 及以上",
+        "DEBUG" to "Debug 及以上",
+        "INFO" to "Info 及以上",
+        "WARN" to "Warning 及以上",
+        "ERROR" to "仅 Error",
+    )
+    var expanded by remember { mutableStateOf(false) }
+    val selectedLevel = logLevelOptions.firstOrNull { it.first.equals(level, ignoreCase = true) }
+        ?: logLevelOptions[2]
+    val visibleLogs = if (enabled) {
+        logs.filter { entry -> debugLogPriority(entry.level) >= debugLogPriority(selectedLevel.first) }
+    } else {
+        emptyList()
+    }
+
     SettingsCard {
         Row(modifier = Modifier.fillMaxWidth()) {
             Text(
@@ -477,20 +504,63 @@ private fun DebugLogCard(
                 style = MaterialTheme.typography.titleMedium,
                 modifier = Modifier.weight(1f),
             )
-            TextButton(onClick = onClearDebugLogs) {
+            TextButton(
+                onClick = onClearDebugLogs,
+                enabled = logs.isNotEmpty(),
+            ) {
                 Text("清空")
+            }
+        }
+        SwitchSetting("启用调试日志", enabled, onEnabledChange)
+        ExposedDropdownMenuBox(
+            expanded = expanded,
+            onExpandedChange = { if (enabled) expanded = !expanded },
+        ) {
+            OutlinedTextField(
+                modifier = Modifier
+                    .menuAnchor()
+                    .fillMaxWidth(),
+                readOnly = true,
+                enabled = enabled,
+                value = selectedLevel.second,
+                onValueChange = {},
+                label = { Text("记录等级") },
+                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+                shape = RoundedCornerShape(16.dp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = MaterialTheme.colorScheme.primary,
+                    unfocusedBorderColor = MaterialTheme.colorScheme.outline,
+                    focusedContainerColor = MaterialTheme.colorScheme.surface,
+                    unfocusedContainerColor = MaterialTheme.colorScheme.surface,
+                )
+            )
+            ExposedDropdownMenu(
+                expanded = expanded,
+                onDismissRequest = { expanded = false },
+            ) {
+                logLevelOptions.forEach { (value, label) ->
+                    DropdownMenuItem(
+                        text = { Text(label) },
+                        onClick = {
+                            expanded = false
+                            onLevelChange(value)
+                        },
+                    )
+                }
             }
         }
         Text(
             text = "临时诊断用。可直接截图给我，日志不会显示 API Key。",
             style = MaterialTheme.typography.bodySmall,
         )
-        if (logs.isEmpty()) {
+        if (!enabled) {
+            Text(text = "调试日志已关闭", style = MaterialTheme.typography.bodySmall)
+        } else if (visibleLogs.isEmpty()) {
             Text(text = "暂无日志", style = MaterialTheme.typography.bodySmall)
         } else {
             SelectionContainer {
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    logs.takeLast(30).asReversed().forEach { entry ->
+                    visibleLogs.takeLast(30).asReversed().forEach { entry ->
                         Text(
                             text = buildString {
                                 append(timeFormat.format(Date(entry.timestampMillis)))
@@ -510,6 +580,16 @@ private fun DebugLogCard(
         }
     }
 }
+
+private fun debugLogPriority(level: String): Int =
+    when (level.uppercase(Locale.US)) {
+        "V", "VERBOSE" -> 0
+        "D", "DEBUG" -> 10
+        "I", "INFO" -> 20
+        "W", "WARN", "WARNING" -> 30
+        "E", "ERROR" -> 40
+        else -> 20
+    }
 
 private fun formatBytes(bytes: Long): String {
     if (bytes < 1024) return "$bytes B"

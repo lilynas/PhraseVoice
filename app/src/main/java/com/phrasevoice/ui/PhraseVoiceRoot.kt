@@ -207,6 +207,8 @@ fun PhraseVoiceRoot(container: AppContainer) {
                         onKeepAudioCacheChange = settingsViewModel::updateKeepAudioCache,
                         onClearAudioCache = settingsViewModel::clearAudioCache,
                         onClearDebugLogs = settingsViewModel::clearDebugLogs,
+                        onDebugLoggingEnabledChange = settingsViewModel::updateDebugLoggingEnabled,
+                        onDebugLogLevelChange = settingsViewModel::updateDebugLogLevel,
                         onRefreshAudioCache = settingsViewModel::refreshAudioCacheInfo,
                         onThemeModeChange = settingsViewModel::updateThemeMode,
                         modifier = modifier,

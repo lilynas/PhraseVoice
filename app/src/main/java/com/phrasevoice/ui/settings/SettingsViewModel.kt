@@ -15,6 +15,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -41,6 +42,17 @@ class SettingsViewModel(
 ) : ViewModel() {
     private val audioCacheInfo = MutableStateFlow(audioFileStore.cacheInfo())
     private val cacheMessage = MutableStateFlow<String?>(null)
+
+    init {
+        viewModelScope.launch {
+            settingsRepository.settings.collect { settings ->
+                AppLogger.configure(
+                    enabled = settings.debugLoggingEnabled,
+                    minLevel = settings.debugLogLevel,
+                )
+            }
+        }
+    }
 
     val uiState: StateFlow<SettingsUiState> = combine(
         settingsRepository.settings,
@@ -89,6 +101,14 @@ class SettingsViewModel(
 
     fun updateThemeMode(value: String) {
         update { it.copy(themeMode = value) }
+    }
+
+    fun updateDebugLoggingEnabled(value: Boolean) {
+        update { it.copy(debugLoggingEnabled = value) }
+    }
+
+    fun updateDebugLogLevel(value: String) {
+        update { it.copy(debugLogLevel = value) }
     }
 
     fun clearDebugLogs() {
