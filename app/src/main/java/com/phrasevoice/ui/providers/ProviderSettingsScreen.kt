@@ -100,14 +100,10 @@ fun ProviderSettingsScreen(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
-                text = "声音引擎 (Provider)",
+                text = "Provider",
                 style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.ExtraBold),
                 color = MaterialTheme.colorScheme.onBackground,
-                modifier = Modifier.weight(1f),
             )
-            state.savedMessage?.let {
-                AssistChip(onClick = {}, label = { Text(it) })
-            }
         }
 
         state.configs.forEach { config ->
@@ -271,6 +267,17 @@ fun ProviderSettingsScreen(
                                 onResponseTypeChange = onResponseTypeChange,
                                 onResponseFieldChange = onResponseFieldChange,
                                 onApplyTemplate = onApplyTemplate,
+                            )
+                        }
+
+                        state.savedMessage?.let { msg ->
+                            val isError = msg.contains("失败") || msg.contains("错误")
+                            val color = if (isError) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
+                            Text(
+                                text = msg,
+                                color = color,
+                                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                                modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 4.dp)
                             )
                         }
 
