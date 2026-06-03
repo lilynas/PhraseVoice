@@ -1,5 +1,6 @@
 package com.phrasevoice.ui
 
+import android.app.Activity
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.History
@@ -17,15 +18,18 @@ import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.Modifier
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -35,6 +39,7 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.Spring
+import androidx.core.view.WindowCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.phrasevoice.ui.theme.PhraseVoiceTheme
@@ -82,6 +87,8 @@ fun PhraseVoiceRoot(container: AppContainer) {
     }
 
     PhraseVoiceTheme(darkTheme = isDarkTheme) {
+        SystemBarsEffect(darkTheme = isDarkTheme)
+
         Scaffold(
             bottomBar = {
                 NavigationBar {
@@ -216,5 +223,22 @@ fun PhraseVoiceRoot(container: AppContainer) {
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun SystemBarsEffect(darkTheme: Boolean) {
+    val view = LocalView.current
+    val backgroundColor = androidx.compose.material3.MaterialTheme.colorScheme.background.toArgb()
+    val navigationColor = androidx.compose.material3.MaterialTheme.colorScheme.surface.toArgb()
+
+    SideEffect {
+        val window = (view.context as? Activity)?.window ?: return@SideEffect
+        window.statusBarColor = backgroundColor
+        window.navigationBarColor = navigationColor
+
+        val controller = WindowCompat.getInsetsController(window, view)
+        controller.isAppearanceLightStatusBars = !darkTheme
+        controller.isAppearanceLightNavigationBars = !darkTheme
     }
 }
