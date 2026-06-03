@@ -63,6 +63,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.phrasevoice.BuildConfig
 import com.phrasevoice.debug.DebugLogEntry
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -638,7 +639,7 @@ private fun AboutDialog(
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Text(
-                    text = "PhraseVoice v1.0.0",
+                    text = "PhraseVoice v${BuildConfig.VERSION_NAME}",
                     style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Bold),
                     textAlign = TextAlign.Center,
                     modifier = Modifier.fillMaxWidth()
