@@ -3,6 +3,9 @@ package com.phrasevoice.ui.home
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -11,11 +14,19 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.VolumeMute
+import androidx.compose.material.icons.automirrored.outlined.VolumeUp
+import androidx.compose.material.icons.outlined.ArrowDownward
+import androidx.compose.material.icons.outlined.ArrowUpward
+import androidx.compose.material.icons.outlined.DirectionsRun
+import androidx.compose.material.icons.outlined.DirectionsWalk
 import androidx.compose.material.icons.outlined.Download
 import androidx.compose.material.icons.outlined.PlayArrow
 import androidx.compose.material.icons.outlined.Share
@@ -34,6 +45,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -41,8 +53,11 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.phrasevoice.data.model.Phrase
@@ -75,28 +90,47 @@ fun HomeScreen(
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
             .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
         Text(
             text = "PhraseVoice",
-            style = MaterialTheme.typography.headlineMedium,
+            style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold),
         )
 
-        ProviderDropdown(
-            state = state,
-            onProviderSelected = onProviderSelected,
-        )
+        Card(
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.25f)
+            ),
+            shape = RoundedCornerShape(24.dp),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(
+                modifier = Modifier.padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Text(
+                    text = "声音引擎配置",
+                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                    color = MaterialTheme.colorScheme.primary
+                )
 
-        VoiceDropdown(
-            state = state,
-            onVoiceSelected = onVoiceSelected,
-        )
+                ProviderDropdown(
+                    state = state,
+                    onProviderSelected = onProviderSelected,
+                )
 
-        if (state.voiceStyles.isNotEmpty()) {
-            VoiceStyleDropdown(
-                state = state,
-                onVoiceStyleSelected = onVoiceStyleSelected,
-            )
+                VoiceDropdown(
+                    state = state,
+                    onVoiceSelected = onVoiceSelected,
+                )
+
+                if (state.voiceStyles.isNotEmpty()) {
+                    VoiceStyleDropdown(
+                        state = state,
+                        onVoiceStyleSelected = onVoiceStyleSelected,
+                    )
+                }
+            }
         }
 
         OutlinedTextField(
@@ -107,9 +141,30 @@ fun HomeScreen(
             modifier = Modifier.fillMaxWidth(),
         )
 
-        SliderRow(label = "语速", value = state.speed, range = 0.5f..2.0f, onChange = onSpeedChange)
-        SliderRow(label = "音调", value = state.pitch, range = 0.5f..2.0f, onChange = onPitchChange)
-        SliderRow(label = "音量", value = state.volume, range = 0.0f..1.0f, onChange = onVolumeChange)
+        SliderRow(
+            label = "语速",
+            value = state.speed,
+            range = 0.5f..2.0f,
+            startIcon = Icons.Outlined.DirectionsWalk,
+            endIcon = Icons.Outlined.DirectionsRun,
+            onChange = onSpeedChange
+        )
+        SliderRow(
+            label = "音调",
+            value = state.pitch,
+            range = 0.5f..2.0f,
+            startIcon = Icons.Outlined.ArrowDownward,
+            endIcon = Icons.Outlined.ArrowUpward,
+            onChange = onPitchChange
+        )
+        SliderRow(
+            label = "音量",
+            value = state.volume,
+            range = 0.0f..1.0f,
+            startIcon = Icons.AutoMirrored.Outlined.VolumeMute,
+            endIcon = Icons.AutoMirrored.Outlined.VolumeUp,
+            onChange = onVolumeChange
+        )
 
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Button(
@@ -308,20 +363,115 @@ private fun VoiceDropdown(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun SliderRow(
     label: String,
     value: Float,
     range: ClosedFloatingPointRange<Float>,
+    startIcon: ImageVector,
+    endIcon: ImageVector,
     onChange: (Float) -> Unit,
 ) {
-    Column {
-        Row(modifier = Modifier.fillMaxWidth()) {
-            Text(text = label, style = MaterialTheme.typography.labelLarge)
-            Spacer(modifier = Modifier.weight(1f))
-            Text(text = "%.2f".format(value), style = MaterialTheme.typography.labelLarge)
+    Card(
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)
+        ),
+        shape = RoundedCornerShape(20.dp),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = label,
+                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Spacer(modifier = Modifier.weight(1f))
+                Text(
+                    text = "%.2f".format(value),
+                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
+
+            Spacer(modifier = Modifier.height(6.dp))
+
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = startIcon,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                    modifier = Modifier.size(20.dp)
+                )
+
+                val interactionSource = remember { MutableInteractionSource() }
+                val isPressed by interactionSource.collectIsPressedAsState()
+                val thumbSizeAnim by animateDpAsState(
+                    targetValue = if (isPressed) 24.dp else 18.dp,
+                    label = "thumbSize"
+                )
+
+                val primaryColor = MaterialTheme.colorScheme.primary
+                val tertiaryColor = MaterialTheme.colorScheme.tertiary
+                val inactiveColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.15f)
+
+                Slider(
+                    value = value,
+                    onValueChange = onChange,
+                    valueRange = range,
+                    interactionSource = interactionSource,
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(horizontal = 10.dp),
+                    thumb = {
+                        SliderDefaults.Thumb(
+                            interactionSource = interactionSource,
+                            colors = SliderDefaults.colors(thumbColor = primaryColor),
+                            modifier = Modifier.size(thumbSizeAnim)
+                        )
+                    },
+                    track = { sliderPositions ->
+                        val fraction = sliderPositions.activeRange.endInclusive
+                        androidx.compose.foundation.Canvas(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(8.dp)
+                        ) {
+                            val width = size.width
+                            val height = size.height
+                            val centerY = height / 2f
+                            val cornerRadius = androidx.compose.ui.geometry.CornerRadius(height / 2f, height / 2f)
+
+                            // Inactive track
+                            drawRoundRect(
+                                color = inactiveColor,
+                                topLeft = androidx.compose.ui.geometry.Offset(0f, centerY - 4.dp.toPx()),
+                                size = androidx.compose.ui.geometry.Size(width, 8.dp.toPx()),
+                                cornerRadius = cornerRadius
+                            )
+
+                            // Active track with linear gradient!
+                            drawRoundRect(
+                                brush = androidx.compose.ui.graphics.Brush.linearGradient(
+                                    colors = listOf(primaryColor, tertiaryColor)
+                                ),
+                                topLeft = androidx.compose.ui.geometry.Offset(0f, centerY - 4.dp.toPx()),
+                                size = androidx.compose.ui.geometry.Size(width * fraction, 8.dp.toPx()),
+                                cornerRadius = cornerRadius
+                            )
+                        }
+                    }
+                )
+
+                Icon(
+                    imageVector = endIcon,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
         }
-        Slider(value = value, onValueChange = onChange, valueRange = range)
     }
 }
 
