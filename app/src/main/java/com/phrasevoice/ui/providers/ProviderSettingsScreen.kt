@@ -106,13 +106,10 @@ fun ProviderSettingsScreen(
             )
         }
 
-        state.configs.forEach { config ->
-            ProviderSummaryCard(
-                config = config,
-                selected = config.providerId == state.selectedProviderId,
-                onClick = { onProviderSelected(config.providerId) },
-            )
-        }
+        ProviderSelectorDropdown(
+            state = state,
+            onProviderSelected = onProviderSelected,
+        )
 
         Card(
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
@@ -475,49 +472,86 @@ private fun MimoVoiceDesignFields(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun ProviderSummaryCard(
-    config: ProviderConfig,
-    selected: Boolean,
-    onClick: () -> Unit,
+private fun ProviderSelectorDropdown(
+    state: ProviderSettingsUiState,
+    onProviderSelected: (String) -> Unit,
 ) {
-    FilterChip(
-        selected = selected,
-        onClick = onClick,
-        label = {
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    ProviderIcon(config.providerId)
-                    Text(
-                        text = providerLabel(config.providerId),
-                        style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Medium),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
-                Text(
-                    text = if (config.enabled) "已启用" else "未启用",
-                    style = MaterialTheme.typography.bodyMedium.copy(
-                        fontWeight = FontWeight.Bold,
-                        color = if (config.enabled) {
-                            MaterialTheme.colorScheme.primary
-                        } else {
-                            MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+    var expanded by remember { mutableStateOf(false) }
+    val selectedConfig = state.configs.firstOrNull { it.providerId == state.selectedProviderId }
+    val selectedLabel = selectedConfig?.let { providerLabel(it.providerId) }.orEmpty()
+
+    ExposedDropdownMenuBox(
+        expanded = expanded,
+        onExpandedChange = { expanded = !expanded },
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        OutlinedTextField(
+            modifier = Modifier
+                .menuAnchor()
+                .fillMaxWidth(),
+            readOnly = true,
+            value = selectedLabel,
+            onValueChange = {},
+            label = { Text("选择 Provider 声音引擎") },
+            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+            leadingIcon = {
+                selectedConfig?.let { ProviderIcon(it.providerId) }
+            },
+            shape = RoundedCornerShape(16.dp),
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedBorderColor = MaterialTheme.colorScheme.primary,
+                unfocusedBorderColor = MaterialTheme.colorScheme.outline,
+                focusedContainerColor = MaterialTheme.colorScheme.surface,
+                unfocusedContainerColor = MaterialTheme.colorScheme.surface,
+            )
+        )
+        ExposedDropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false },
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            state.configs.forEach { config ->
+                DropdownMenuItem(
+                    text = {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                ProviderIcon(config.providerId)
+                                Text(
+                                    text = providerLabel(config.providerId),
+                                    style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Medium),
+                                )
+                            }
+                            Text(
+                                text = if (config.enabled) "已启用" else "未启用",
+                                style = MaterialTheme.typography.bodyMedium.copy(
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (config.enabled) {
+                                        MaterialTheme.colorScheme.primary
+                                    } else {
+                                        MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                                    }
+                                ),
+                                modifier = Modifier.padding(end = 4.dp)
+                            )
                         }
-                    ),
-                    modifier = Modifier.padding(end = 4.dp)
+                    },
+                    onClick = {
+                        expanded = false
+                        onProviderSelected(config.providerId)
+                    },
                 )
             }
-        },
-        modifier = Modifier.fillMaxWidth(),
-    )
+        }
+    }
 }
 
 @Composable
