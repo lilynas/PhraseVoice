@@ -93,10 +93,15 @@ fun ProviderSettingsScreen(
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
             Text(
-                text = "Provider",
-                style = MaterialTheme.typography.headlineMedium,
+                text = "声音引擎 (Provider)",
+                style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.ExtraBold),
+                color = MaterialTheme.colorScheme.onBackground,
                 modifier = Modifier.weight(1f),
             )
             state.savedMessage?.let {
@@ -198,12 +203,18 @@ fun ProviderSettingsScreen(
                                 onMimoUseStreamingChange = onMimoUseStreamingChange,
                             )
                         } else if (!state.isEdgeForwarder) {
-                            StyledOutlinedTextField(
+                            val modelOptions = when (state.selectedProviderId) {
+                                ProviderConfigRepository.OPENAI -> listOf("tts-1", "tts-1-hd")
+                                ProviderConfigRepository.GEMINI -> listOf("gemini-1.5-flash", "gemini-1.5-pro")
+                                ProviderConfigRepository.CUSTOM_HTTP -> listOf("tts-1", "tts-1-hd", "gpt-4o")
+                                else -> emptyList()
+                            }
+                            GenericCombobox(
+                                label = "模型",
                                 value = state.modelDraft,
+                                options = modelOptions,
                                 onValueChange = onModelChange,
-                                label = { Text("模型") },
-                                singleLine = true,
-                                modifier = Modifier.fillMaxWidth(),
+                                readOnly = false
                             )
                         }
 
@@ -236,12 +247,17 @@ fun ProviderSettingsScreen(
                                 onVoiceChange = onVoiceChange,
                             )
                         } else {
-                            StyledOutlinedTextField(
+                            val voiceOptions = when (state.selectedProviderId) {
+                                ProviderConfigRepository.OPENAI -> listOf("alloy", "echo", "fable", "onyx", "nova", "shimmer")
+                                ProviderConfigRepository.CUSTOM_HTTP -> listOf("alloy", "echo", "fable", "onyx", "nova", "shimmer")
+                                else -> emptyList()
+                            }
+                            GenericCombobox(
+                                label = "默认 Voice",
                                 value = state.voiceDraft,
+                                options = voiceOptions,
                                 onValueChange = onVoiceChange,
-                                label = { Text("默认 Voice") },
-                                singleLine = true,
-                                modifier = Modifier.fillMaxWidth(),
+                                readOnly = false
                             )
                         }
 
@@ -913,4 +929,48 @@ private fun StyledOutlinedTextField(
             unfocusedContainerColor = MaterialTheme.colorScheme.surface,
         )
     )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun GenericCombobox(
+    label: String,
+    value: String,
+    options: List<String>,
+    onValueChange: (String) -> Unit,
+    readOnly: Boolean = false,
+) {
+    var expanded by remember { mutableStateOf(false) }
+
+    ExposedDropdownMenuBox(
+        expanded = expanded,
+        onExpandedChange = { expanded = !expanded },
+    ) {
+        StyledOutlinedTextField(
+            modifier = Modifier
+                .menuAnchor()
+                .fillMaxWidth(),
+            readOnly = readOnly,
+            value = value,
+            onValueChange = onValueChange,
+            label = { Text(label) },
+            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+        )
+        if (options.isNotEmpty()) {
+            ExposedDropdownMenu(
+                expanded = expanded,
+                onDismissRequest = { expanded = false },
+            ) {
+                options.forEach { option ->
+                    DropdownMenuItem(
+                        text = { Text(option) },
+                        onClick = {
+                            expanded = false
+                            onValueChange(option)
+                        },
+                    )
+                }
+            }
+        }
+    }
 }

@@ -140,11 +140,6 @@ fun PhraseLibraryScreen(
                     style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.ExtraBold),
                     color = MaterialTheme.colorScheme.onBackground
                 )
-                Text(
-                    text = "管理并快速播放您常用的词句",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
-                )
             }
             Button(
                 onClick = onAddPhrase,

@@ -106,9 +106,9 @@ fun SettingsScreen(
                 horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
                 listOf(
-                    Triple("system", "系统默认", Icons.Outlined.BrightnessAuto),
-                    Triple("light", "浅色 (日系奶白)", Icons.Outlined.LightMode),
-                    Triple("dark", "深色 (OLED完全黑)", Icons.Outlined.DarkMode)
+                    Triple("system", "默认", Icons.Outlined.BrightnessAuto),
+                    Triple("light", "白色", Icons.Outlined.LightMode),
+                    Triple("dark", "黑色", Icons.Outlined.DarkMode)
                 ).forEach { (mode, label, icon) ->
                     val isSelected = settings.themeMode == mode
                     FilterChip(

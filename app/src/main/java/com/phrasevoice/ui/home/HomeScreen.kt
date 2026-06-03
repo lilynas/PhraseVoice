@@ -143,7 +143,7 @@ fun HomeScreen(
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        // App Title Section
+        // App Title Section (No Slogan)
         Row(
             modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -155,60 +155,17 @@ fun HomeScreen(
                     style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.ExtraBold),
                     color = MaterialTheme.colorScheme.onBackground
                 )
-                Text(
-                    text = "一键设置，开箱即用的语音合成器",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
-                )
             }
         }
 
-        // Engine Configuration Card
-        Card(
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surface
-            ),
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
-            shape = RoundedCornerShape(24.dp),
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Column(
-                modifier = Modifier.padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(14.dp)
-            ) {
-                Text(
-                    text = "声音引擎配置",
-                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                    color = MaterialTheme.colorScheme.primary
-                )
-
-                ProviderDropdown(
-                    state = state,
-                    onProviderSelected = onProviderSelected,
-                )
-
-                VoiceDropdown(
-                    state = state,
-                    onVoiceSelected = onVoiceSelected,
-                )
-
-                if (state.voiceStyles.isNotEmpty()) {
-                    VoiceStyleDropdown(
-                        state = state,
-                        onVoiceStyleSelected = onVoiceStyleSelected,
-                    )
-                }
-            }
-        }
-
-        // Text input textfield
+        // 1. Text input textfield (Double height)
         OutlinedTextField(
             value = state.text,
             onValueChange = onTextChange,
             label = { Text("朗读文本") },
             placeholder = { Text("请输入要朗读的文本...", color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)) },
-            minLines = 4,
-            maxLines = 8,
+            minLines = 8,
+            maxLines = 16,
             shape = RoundedCornerShape(20.dp),
             colors = OutlinedTextFieldDefaults.colors(
                 focusedBorderColor = MaterialTheme.colorScheme.primary,
@@ -216,38 +173,10 @@ fun HomeScreen(
                 focusedContainerColor = MaterialTheme.colorScheme.surface,
                 unfocusedContainerColor = MaterialTheme.colorScheme.surface,
             ),
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth().heightIn(min = 180.dp),
         )
 
-        // Parameters Card
-        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            SliderRow(
-                label = "语速",
-                value = state.speed,
-                range = 0.5f..2.0f,
-                startIcon = Icons.Outlined.DirectionsWalk,
-                endIcon = Icons.Outlined.DirectionsRun,
-                onChange = onSpeedChange
-            )
-            SliderRow(
-                label = "音调",
-                value = state.pitch,
-                range = 0.5f..2.0f,
-                startIcon = Icons.Outlined.ArrowDownward,
-                endIcon = Icons.Outlined.ArrowUpward,
-                onChange = onPitchChange
-            )
-            SliderRow(
-                label = "音量",
-                value = state.volume,
-                range = 0.0f..1.0f,
-                startIcon = Icons.AutoMirrored.Outlined.VolumeMute,
-                endIcon = Icons.AutoMirrored.Outlined.VolumeUp,
-                onChange = onVolumeChange
-            )
-        }
-
-        // Control Actions Card
+        // 2. Control Actions Card (开始朗读 / 保存)
         Card(
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
             border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
@@ -352,7 +281,7 @@ fun HomeScreen(
             }
         }
 
-        // Quick Phrases Section
+        // 3. Quick Phrases Section (常用语)
         if (state.quickPhrases.isNotEmpty()) {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(
@@ -383,6 +312,89 @@ fun HomeScreen(
                         )
                     }
                 }
+            }
+        }
+
+        // 4. Engine Configuration Card (声音引擎配置)
+        Card(
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surface
+            ),
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+            shape = RoundedCornerShape(24.dp),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(
+                modifier = Modifier.padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
+                Text(
+                    text = "声音引擎配置",
+                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                    color = MaterialTheme.colorScheme.primary
+                )
+
+                ProviderDropdown(
+                    state = state,
+                    onProviderSelected = onProviderSelected,
+                )
+
+                VoiceDropdown(
+                    state = state,
+                    onVoiceSelected = onVoiceSelected,
+                )
+
+                if (state.voiceStyles.isNotEmpty()) {
+                    VoiceStyleDropdown(
+                        state = state,
+                        onVoiceStyleSelected = onVoiceStyleSelected,
+                    )
+                }
+            }
+        }
+
+        // 5. Sliders combined in a single card (语速、音调、音量)
+        Card(
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surface
+            ),
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+            shape = RoundedCornerShape(24.dp),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(
+                modifier = Modifier.padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                Text(
+                    text = "声音属性设置",
+                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                    color = MaterialTheme.colorScheme.primary
+                )
+                SliderItem(
+                    label = "语速",
+                    value = state.speed,
+                    range = 0.5f..2.0f,
+                    startIcon = Icons.Outlined.DirectionsWalk,
+                    endIcon = Icons.Outlined.DirectionsRun,
+                    onChange = onSpeedChange
+                )
+                SliderItem(
+                    label = "音调",
+                    value = state.pitch,
+                    range = 0.5f..2.0f,
+                    startIcon = Icons.Outlined.ArrowDownward,
+                    endIcon = Icons.Outlined.ArrowUpward,
+                    onChange = onPitchChange
+                )
+                SliderItem(
+                    label = "音量",
+                    value = state.volume,
+                    range = 0.0f..1.0f,
+                    startIcon = Icons.AutoMirrored.Outlined.VolumeMute,
+                    endIcon = Icons.AutoMirrored.Outlined.VolumeUp,
+                    onChange = onVolumeChange
+                )
             }
         }
     }
@@ -544,7 +556,7 @@ private fun VoiceDropdown(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun SliderRow(
+private fun SliderItem(
     label: String,
     value: Float,
     range: ClosedFloatingPointRange<Float>,
@@ -552,106 +564,97 @@ private fun SliderRow(
     endIcon: ImageVector,
     onChange: (Float) -> Unit,
 ) {
-    Card(
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface
-        ),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
-        shape = RoundedCornerShape(20.dp),
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    text = label,
-                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                Spacer(modifier = Modifier.weight(1f))
-                Text(
-                    text = "%.2f".format(value),
-                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                    color = MaterialTheme.colorScheme.primary
-                )
-            }
+    Column {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                text = label,
+                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Spacer(modifier = Modifier.weight(1f))
+            Text(
+                text = "%.2f".format(value),
+                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                color = MaterialTheme.colorScheme.primary
+            )
+        }
 
-            Spacer(modifier = Modifier.height(4.dp))
+        Spacer(modifier = Modifier.height(4.dp))
 
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    imageVector = startIcon,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
-                    modifier = Modifier.size(20.dp)
-                )
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(
+                imageVector = startIcon,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                modifier = Modifier.size(20.dp)
+            )
 
-                val interactionSource = remember { MutableInteractionSource() }
-                val isPressed by interactionSource.collectIsPressedAsState()
-                val thumbSizeAnim by animateDpAsState(
-                    targetValue = if (isPressed) 24.dp else 18.dp,
-                    label = "thumbSize"
-                )
+            val interactionSource = remember { MutableInteractionSource() }
+            val isPressed by interactionSource.collectIsPressedAsState()
+            val thumbSizeAnim by animateDpAsState(
+                targetValue = if (isPressed) 24.dp else 18.dp,
+                label = "thumbSize"
+            )
 
-                val primaryColor = MaterialTheme.colorScheme.primary
-                val tertiaryColor = MaterialTheme.colorScheme.tertiary
-                val inactiveColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.15f)
+            val primaryColor = MaterialTheme.colorScheme.primary
+            val tertiaryColor = MaterialTheme.colorScheme.tertiary
+            val inactiveColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.15f)
 
-                Slider(
-                    value = value,
-                    onValueChange = onChange,
-                    valueRange = range,
-                    interactionSource = interactionSource,
-                    modifier = Modifier
-                        .weight(1f)
-                        .padding(horizontal = 10.dp),
-                    thumb = { _ ->
-                        SliderDefaults.Thumb(
-                            interactionSource = interactionSource,
-                            colors = SliderDefaults.colors(thumbColor = primaryColor),
-                            modifier = Modifier.size(thumbSizeAnim)
+            Slider(
+                value = value,
+                onValueChange = onChange,
+                valueRange = range,
+                interactionSource = interactionSource,
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(horizontal = 10.dp),
+                thumb = { _ ->
+                    SliderDefaults.Thumb(
+                        interactionSource = interactionSource,
+                        colors = SliderDefaults.colors(thumbColor = primaryColor),
+                        modifier = Modifier.size(thumbSizeAnim)
+                    )
+                },
+                track = { sliderState ->
+                    val fraction = (sliderState.value - sliderState.valueRange.start) /
+                            (sliderState.valueRange.endInclusive - sliderState.valueRange.start)
+                    Canvas(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(8.dp)
+                    ) {
+                        val width = size.width
+                        val height = size.height
+                        val centerY = height / 2f
+                        val cornerRadius = androidx.compose.ui.geometry.CornerRadius(height / 2f, height / 2f)
+
+                        // Inactive track
+                        drawRoundRect(
+                            color = inactiveColor,
+                            topLeft = androidx.compose.ui.geometry.Offset(0f, centerY - 4.dp.toPx()),
+                            size = androidx.compose.ui.geometry.Size(width, 8.dp.toPx()),
+                            cornerRadius = cornerRadius
                         )
-                    },
-                    track = { sliderState ->
-                        val fraction = (sliderState.value - sliderState.valueRange.start) /
-                                (sliderState.valueRange.endInclusive - sliderState.valueRange.start)
-                        Canvas(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(8.dp)
-                        ) {
-                            val width = size.width
-                            val height = size.height
-                            val centerY = height / 2f
-                            val cornerRadius = androidx.compose.ui.geometry.CornerRadius(height / 2f, height / 2f)
 
-                            // Inactive track
-                            drawRoundRect(
-                                color = inactiveColor,
-                                topLeft = androidx.compose.ui.geometry.Offset(0f, centerY - 4.dp.toPx()),
-                                size = androidx.compose.ui.geometry.Size(width, 8.dp.toPx()),
-                                cornerRadius = cornerRadius
-                            )
-
-                            // Active track with linear gradient
-                            drawRoundRect(
-                                brush = androidx.compose.ui.graphics.Brush.linearGradient(
-                                    colors = listOf(primaryColor, tertiaryColor)
-                                ),
-                                topLeft = androidx.compose.ui.geometry.Offset(0f, centerY - 4.dp.toPx()),
-                                size = androidx.compose.ui.geometry.Size(width * fraction, 8.dp.toPx()),
-                                cornerRadius = cornerRadius
-                            )
-                        }
+                        // Active track with linear gradient
+                        drawRoundRect(
+                            brush = androidx.compose.ui.graphics.Brush.linearGradient(
+                                colors = listOf(primaryColor, tertiaryColor)
+                            ),
+                            topLeft = androidx.compose.ui.geometry.Offset(0f, centerY - 4.dp.toPx()),
+                            size = androidx.compose.ui.geometry.Size(width * fraction, 8.dp.toPx()),
+                            cornerRadius = cornerRadius
+                        )
                     }
-                )
+                }
+            )
 
-                Icon(
-                    imageVector = endIcon,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(20.dp)
-                )
-            }
+            Icon(
+                imageVector = endIcon,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(20.dp)
+            )
         }
     }
 }

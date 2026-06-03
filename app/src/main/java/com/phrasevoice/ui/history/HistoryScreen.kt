@@ -72,11 +72,6 @@ fun HistoryScreen(
                     style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.ExtraBold),
                     color = MaterialTheme.colorScheme.onBackground
                 )
-                Text(
-                    text = "您朗读过的所有文本记录",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
-                )
             }
             if (state.items.isNotEmpty()) {
                 TextButton(
