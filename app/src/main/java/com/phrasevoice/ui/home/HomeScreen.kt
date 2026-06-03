@@ -424,15 +424,16 @@ private fun SliderRow(
                     modifier = Modifier
                         .weight(1f)
                         .padding(horizontal = 10.dp),
-                    thumb = {
+                    thumb = { _ ->
                         SliderDefaults.Thumb(
                             interactionSource = interactionSource,
                             colors = SliderDefaults.colors(thumbColor = primaryColor),
                             modifier = Modifier.size(thumbSizeAnim)
                         )
                     },
-                    track = { sliderPositions ->
-                        val fraction = sliderPositions.activeRange.endInclusive
+                    track = { sliderState ->
+                        val fraction = (sliderState.value - sliderState.valueRange.start) /
+                                (sliderState.valueRange.endInclusive - sliderState.valueRange.start)
                         androidx.compose.foundation.Canvas(
                             modifier = Modifier
                                 .fillMaxWidth()
