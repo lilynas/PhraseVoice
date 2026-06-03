@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -23,7 +22,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material3.AlertDialog
 import androidx.compose.ui.platform.LocalUriHandler
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.material.icons.automirrored.outlined.VolumeMute
@@ -551,8 +549,8 @@ private fun AboutDialog(
             )
         },
         icon = {
-            Image(
-                painter = painterResource(id = com.phrasevoice.R.mipmap.ic_launcher),
+            Icon(
+                imageVector = Icons.Outlined.Info,
                 contentDescription = "App Icon",
                 modifier = Modifier
                     .size(64.dp)
@@ -586,17 +584,17 @@ private fun AboutDialog(
                 AboutLinkItem(
                     label = "作者",
                     value = "shirone",
-                    onClick = { uriHandler.openUri("https://github.com/lilynas") }
+                    onClick = { runCatching { uriHandler.openUri("https://github.com/lilynas") } }
                 )
                 AboutLinkItem(
                     label = "项目开源地址",
                     value = "Lilynas/PhraseVoice",
-                    onClick = { uriHandler.openUri("https://github.com/lilynas/PhraseVoice") }
+                    onClick = { runCatching { uriHandler.openUri("https://github.com/lilynas/PhraseVoice") } }
                 )
                 AboutLinkItem(
                     label = "问题反馈 (Issues)",
                     value = "提交 Issue",
-                    onClick = { uriHandler.openUri("https://github.com/lilynas/PhraseVoice/issues") }
+                    onClick = { runCatching { uriHandler.openUri("https://github.com/lilynas/PhraseVoice/issues") } }
                 )
             }
         }

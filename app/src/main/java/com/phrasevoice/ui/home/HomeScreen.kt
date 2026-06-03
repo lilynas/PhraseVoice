@@ -87,7 +87,7 @@ fun VoiceWaveIndicator(
         val transition = rememberInfiniteTransition(label = "wave")
         val heights = listOf(0.3f, 0.9f, 0.5f)
         val durations = listOf(500, 700, 600)
-        
+
         heights.zip(durations).forEach { (initialHeight, duration) ->
             val scale by transition.animateFloat(
                 initialValue = initialHeight,
@@ -216,7 +216,7 @@ fun HomeScreen(
                             fontWeight = FontWeight.Bold
                         )
                     }
-                    
+
                     if (state.status == HomeStatus.Playing) {
                         Button(
                             onClick = onStop,
