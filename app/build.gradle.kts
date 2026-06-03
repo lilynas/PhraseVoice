@@ -10,7 +10,7 @@ android {
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.phrasevoice"
+        applicationId = "com.shirone.phrasevoice"
         minSdk = 26
         targetSdk = 35
         versionCode = 3
