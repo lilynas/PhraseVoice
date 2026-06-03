@@ -121,7 +121,9 @@ fun ProviderSettingsScreen(
                 modifier = Modifier.padding(12.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                Row {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
                     Text(
                         text = providerLabel(state.selectedProviderId),
                         style = MaterialTheme.typography.titleLarge,
