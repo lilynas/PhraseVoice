@@ -35,6 +35,7 @@ import androidx.compose.material.icons.outlined.DarkMode
 import androidx.compose.material.icons.outlined.DirectionsRun
 import androidx.compose.material.icons.outlined.DirectionsWalk
 import androidx.compose.material.icons.outlined.LightMode
+import androidx.compose.material.icons.outlined.Translate
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -282,11 +283,11 @@ private fun LanguageSwitcher(
                 .clickable { expanded = true },
             contentAlignment = Alignment.Center,
         ) {
-            Text(
-                text = "文A",
-                style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Black),
-                color = MaterialTheme.colorScheme.primary,
-                maxLines = 1,
+            Icon(
+                imageVector = Icons.Outlined.Translate,
+                contentDescription = t("切换语言", "Switch Language"),
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(20.dp),
             )
         }
         DropdownMenu(
