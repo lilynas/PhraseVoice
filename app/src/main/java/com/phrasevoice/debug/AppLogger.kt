@@ -105,7 +105,7 @@ object AppLogger {
 
         companion object {
             fun fromValue(value: String): LogLevel =
-                entries.firstOrNull { it.value.equals(value, ignoreCase = true) } ?: INFO
+                enumValues<LogLevel>().firstOrNull { it.value.equals(value, ignoreCase = true) } ?: INFO
         }
     }
 }
