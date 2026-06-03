@@ -478,17 +478,34 @@ private fun ProviderSummaryCard(
         selected = selected,
         onClick = onClick,
         label = {
-            Column {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
                     ProviderIcon(config.providerId)
-                    Text(providerLabel(config.providerId), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(
+                        text = providerLabel(config.providerId),
+                        style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Medium),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
                 }
                 Text(
-                    text = when {
-                        config.enabled -> "已启用"
-                        else -> "未启用"
-                    },
-                    style = MaterialTheme.typography.bodySmall,
+                    text = if (config.enabled) "已启用" else "未启用",
+                    style = MaterialTheme.typography.bodyMedium.copy(
+                        fontWeight = FontWeight.Bold,
+                        color = if (config.enabled) {
+                            MaterialTheme.colorScheme.primary
+                        } else {
+                            MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                        }
+                    ),
+                    modifier = Modifier.padding(end = 4.dp)
                 )
             }
         },
@@ -878,11 +895,11 @@ private fun CustomHttpFields(
 private fun providerLabel(providerId: String): String =
     when (providerId) {
         ProviderConfigRepository.ANDROID_SYSTEM -> "Android System TTS"
-        ProviderConfigRepository.OPENAI -> "OpenAI-compatible TTS"
+        ProviderConfigRepository.OPENAI -> "OpenAI TTS"
         ProviderConfigRepository.EDGE_TTS_FORWARDER -> "Edge TTS Forwarder"
         ProviderConfigRepository.GEMINI -> "Gemini TTS"
         ProviderConfigRepository.MIMO -> "MiMo TTS"
-        ProviderConfigRepository.CUSTOM_HTTP -> "Custom HTTP TTS"
+        ProviderConfigRepository.CUSTOM_HTTP -> "Custom TTS API"
         else -> providerId
     }
 

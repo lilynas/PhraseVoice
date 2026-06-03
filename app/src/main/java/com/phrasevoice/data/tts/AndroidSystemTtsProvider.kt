@@ -264,7 +264,7 @@ class AndroidSystemTtsProvider(
         AppLogger.w(TAG, "readiness failed attempts=$attempted engines=${engines.map { it.name }}")
         return AndroidTtsReadiness(
             ready = false,
-            message = "Android 系统 TTS 初始化失败/超时。已尝试：${attempted.joinToString()}。请在系统设置中确认默认语音引擎可用，或切换到 OpenAI/Custom HTTP。",
+            message = "Android 系统 TTS 初始化失败/超时。已尝试：${attempted.joinToString()}。请在系统设置中确认默认语音引擎可用，或切换到 OpenAI TTS/Custom TTS API。",
             engines = engines,
         )
     }

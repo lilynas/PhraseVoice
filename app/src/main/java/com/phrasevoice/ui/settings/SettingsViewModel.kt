@@ -133,11 +133,11 @@ class SettingsViewModel(
             id = config.providerId,
             name = when (config.providerId) {
                 ProviderConfigRepository.ANDROID_SYSTEM -> "Android System TTS"
-                ProviderConfigRepository.OPENAI -> "OpenAI-compatible TTS"
+                ProviderConfigRepository.OPENAI -> "OpenAI TTS"
                 ProviderConfigRepository.EDGE_TTS_FORWARDER -> "Edge TTS Forwarder"
                 ProviderConfigRepository.GEMINI -> "Gemini TTS"
                 ProviderConfigRepository.MIMO -> "MiMo TTS"
-                ProviderConfigRepository.CUSTOM_HTTP -> "Custom HTTP TTS"
+                ProviderConfigRepository.CUSTOM_HTTP -> "Custom TTS API"
                 else -> config.providerId
             },
             enabled = config.enabled,

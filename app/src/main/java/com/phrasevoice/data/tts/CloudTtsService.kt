@@ -126,7 +126,7 @@ class CloudTtsService(
         val apiKey = runtimeConfig.apiKey
         if (apiKey.isNullOrBlank()) return TtsResult.Error("请先在 Provider 页面保存 API Key。")
         val baseUrl = runtimeConfig.config.baseUrl?.takeIf { it.isNotBlank() }
-            ?: return TtsResult.Error("请先配置 OpenAI-compatible Base URL。")
+            ?: return TtsResult.Error("请先配置 OpenAI Base URL。")
         AppLogger.i(TAG, "openai request url=${baseUrl.safeUrlForLog()}")
         val format = AudioFormat.MP3
         val target = audioFileStore.createTarget(format, cache = cache)
@@ -346,7 +346,7 @@ class CloudTtsService(
     ): TtsResult {
         val config = runtimeConfig.config
         val baseUrl = config.baseUrl?.takeIf { it.isNotBlank() }
-            ?: return TtsResult.Error("请先配置 Custom HTTP Base URL。")
+            ?: return TtsResult.Error("请先配置 Custom TTS API Base URL。")
         AppLogger.i(TAG, "custom request url=${baseUrl.safeUrlForLog()}")
         val settings = com.phrasevoice.data.local.PhraseVoiceJson.decode(
             config.extraJson,
