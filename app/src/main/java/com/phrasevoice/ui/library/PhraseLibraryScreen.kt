@@ -64,6 +64,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.phrasevoice.data.model.Phrase
+import com.phrasevoice.ui.i18n.t
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -91,6 +92,11 @@ fun PhraseLibraryScreen(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var pendingExportJson by remember { mutableStateOf<String?>(null) }
+    val exportFailedPrefix = t("导出失败：", "Export failed: ")
+    val importFailedPrefix = t("导入失败：", "Import failed: ")
+    val cannotWriteFile = t("无法写入文件", "Unable to write file")
+    val cannotReadFile = t("无法读取文件", "Unable to read file")
+    val cannotCreateFile = t("无法生成文件", "Unable to create file")
 
     val exportLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.CreateDocument("application/json"),
@@ -103,7 +109,7 @@ fun PhraseLibraryScreen(
             runCatching { context.writeTextToUri(uri, json) }
                 .onSuccess { onExportCompleted() }
                 .onFailure { throwable ->
-                    onFileActionMessage("导出失败：${throwable.message ?: "无法写入文件"}")
+                    onFileActionMessage("$exportFailedPrefix${throwable.message ?: cannotWriteFile}")
                 }
         }
     }
@@ -117,7 +123,7 @@ fun PhraseLibraryScreen(
             runCatching { context.readTextFromUri(uri) }
                 .onSuccess(onImportJson)
                 .onFailure { throwable ->
-                    onFileActionMessage("导入失败：${throwable.message ?: "无法读取文件"}")
+                    onFileActionMessage("$importFailedPrefix${throwable.message ?: cannotReadFile}")
                 }
         }
     }
@@ -136,7 +142,7 @@ fun PhraseLibraryScreen(
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = "常用语库",
+                    text = t("常用语库", "Phrase Library"),
                     style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.ExtraBold),
                     color = MaterialTheme.colorScheme.onBackground
                 )
@@ -146,7 +152,7 @@ fun PhraseLibraryScreen(
                 shape = RoundedCornerShape(16.dp)
             ) {
                 Icon(Icons.Outlined.Add, contentDescription = null, modifier = Modifier.padding(end = 4.dp))
-                Text("新增", fontWeight = FontWeight.Bold)
+                Text(t("新增", "Add"), fontWeight = FontWeight.Bold)
             }
         }
 
@@ -162,7 +168,7 @@ fun PhraseLibraryScreen(
                 modifier = Modifier.weight(1f),
             ) {
                 Icon(Icons.Outlined.FileUpload, contentDescription = null, modifier = Modifier.padding(end = 4.dp))
-                Text("导入 JSON", fontWeight = FontWeight.SemiBold)
+                Text(t("导入 JSON", "Import JSON"), fontWeight = FontWeight.SemiBold)
             }
             OutlinedButton(
                 onClick = {
@@ -173,7 +179,7 @@ fun PhraseLibraryScreen(
                                 exportLauncher.launch("phrasevoice-phrases.json")
                             }
                             .onFailure { throwable ->
-                                onFileActionMessage("导出失败：${throwable.message ?: "无法生成文件"}")
+                                onFileActionMessage("$exportFailedPrefix${throwable.message ?: cannotCreateFile}")
                             }
                     }
                 },
@@ -182,7 +188,7 @@ fun PhraseLibraryScreen(
                 modifier = Modifier.weight(1f),
             ) {
                 Icon(Icons.Outlined.FileDownload, contentDescription = null, modifier = Modifier.padding(end = 4.dp))
-                Text("导出 JSON", fontWeight = FontWeight.SemiBold)
+                Text(t("导出 JSON", "Export JSON"), fontWeight = FontWeight.SemiBold)
             }
         }
 
@@ -205,7 +211,7 @@ fun PhraseLibraryScreen(
         OutlinedTextField(
             value = state.query,
             onValueChange = onQueryChange,
-            placeholder = { Text("搜索常用语...", color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)) },
+            placeholder = { Text(t("搜索常用语...", "Search phrases..."), color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)) },
             leadingIcon = {
                 Icon(
                     imageVector = Icons.Default.Search,
@@ -218,7 +224,7 @@ fun PhraseLibraryScreen(
                     IconButton(onClick = { onQueryChange("") }) {
                         Icon(
                             imageVector = Icons.Default.Clear,
-                            contentDescription = "清除搜索",
+                            contentDescription = t("清除搜索", "Clear Search"),
                             tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
                         )
                     }
@@ -244,7 +250,7 @@ fun PhraseLibraryScreen(
                 FilterChip(
                     selected = state.selectedGroupId == null,
                     onClick = { onGroupSelected(null) },
-                    label = { Text("全部") },
+                    label = { Text(t("全部", "All")) },
                     shape = RoundedCornerShape(12.dp)
                 )
             }
@@ -324,7 +330,7 @@ private fun PhraseRow(
             ) {
                 Icon(
                     imageVector = Icons.Outlined.Delete,
-                    contentDescription = "删除",
+                    contentDescription = t("删除", "Delete"),
                     tint = MaterialTheme.colorScheme.onErrorContainer
                 )
             }
@@ -346,7 +352,7 @@ private fun PhraseRow(
             ) {
                 Icon(
                     imageVector = Icons.Outlined.PlayArrow,
-                    contentDescription = "播放",
+                    contentDescription = t("播放", "Play"),
                     tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.size(24.dp)
                 )
@@ -372,7 +378,7 @@ private fun PhraseRow(
                 IconButton(onClick = onEdit) {
                     Icon(
                         imageVector = Icons.Outlined.Edit,
-                        contentDescription = "编辑",
+                        contentDescription = t("编辑", "Edit"),
                         tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
                     )
                 }
@@ -380,7 +386,7 @@ private fun PhraseRow(
                 IconButton(onClick = onToggleFavorite) {
                     Icon(
                         imageVector = if (phrase.isFavorite) Icons.Filled.Star else Icons.Outlined.StarBorder,
-                        contentDescription = "收藏",
+                        contentDescription = t("收藏", "Favorite"),
                         tint = if (phrase.isFavorite) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
                     )
                 }
@@ -405,7 +411,7 @@ private fun PhraseEditorDialog(
         containerColor = MaterialTheme.colorScheme.surface,
         title = {
             Text(
-                text = if (state.editingPhraseId == null) "新增常用语" else "编辑常用语",
+                text = if (state.editingPhraseId == null) t("新增常用语", "Add Phrase") else t("编辑常用语", "Edit Phrase"),
                 style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold)
             )
         },
@@ -414,7 +420,7 @@ private fun PhraseEditorDialog(
                 OutlinedTextField(
                     value = state.titleDraft,
                     onValueChange = onTitleDraftChange,
-                    label = { Text("标题") },
+                    label = { Text(t("标题", "Title")) },
                     shape = RoundedCornerShape(14.dp),
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = MaterialTheme.colorScheme.primary,
@@ -425,7 +431,7 @@ private fun PhraseEditorDialog(
                 OutlinedTextField(
                     value = state.textDraft,
                     onValueChange = onTextDraftChange,
-                    label = { Text("内容") },
+                    label = { Text(t("内容", "Content")) },
                     minLines = 3,
                     shape = RoundedCornerShape(14.dp),
                     colors = OutlinedTextFieldDefaults.colors(
@@ -439,7 +445,7 @@ private fun PhraseEditorDialog(
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Text(
-                        text = "收藏常用语",
+                        text = t("收藏常用语", "Favorite Phrase"),
                         fontWeight = FontWeight.Medium,
                         modifier = Modifier.weight(1f)
                     )
@@ -456,7 +462,7 @@ private fun PhraseEditorDialog(
                 enabled = state.textDraft.isNotBlank(),
                 shape = RoundedCornerShape(14.dp)
             ) {
-                Text("保存")
+                Text(t("保存", "Save"))
             }
         },
         dismissButton = {
@@ -464,7 +470,7 @@ private fun PhraseEditorDialog(
                 onClick = onDismiss,
                 shape = RoundedCornerShape(14.dp)
             ) {
-                Text("取消")
+                Text(t("取消", "Cancel"))
             }
         },
     )

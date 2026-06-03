@@ -18,6 +18,7 @@ import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -48,6 +49,9 @@ import com.phrasevoice.ui.history.HistoryScreen
 import com.phrasevoice.ui.history.HistoryViewModel
 import com.phrasevoice.ui.home.HomeScreen
 import com.phrasevoice.ui.home.HomeViewModel
+import com.phrasevoice.ui.i18n.LocalAppLanguage
+import com.phrasevoice.ui.i18n.resolveAppLanguage
+import com.phrasevoice.ui.i18n.t
 import com.phrasevoice.ui.library.PhraseLibraryScreen
 import com.phrasevoice.ui.library.PhraseLibraryViewModel
 import com.phrasevoice.ui.providers.ProviderSettingsScreen
@@ -56,16 +60,25 @@ import com.phrasevoice.ui.settings.SettingsScreen
 import com.phrasevoice.ui.settings.SettingsViewModel
 
 private enum class Destination(
-    val label: String,
     val selectedIcon: ImageVector,
     val unselectedIcon: ImageVector,
 ) {
-    Home("朗读", Icons.Filled.Home, Icons.Outlined.Home),
-    Library("常用语", Icons.Filled.List, Icons.Outlined.List),
-    History("历史", Icons.Filled.History, Icons.Outlined.History),
-    Providers("Provider", Icons.Filled.Build, Icons.Outlined.Build),
-    Settings("设置", Icons.Filled.Settings, Icons.Outlined.Settings),
+    Home(Icons.Filled.Home, Icons.Outlined.Home),
+    Library(Icons.Filled.List, Icons.Outlined.List),
+    History(Icons.Filled.History, Icons.Outlined.History),
+    Providers(Icons.Filled.Build, Icons.Outlined.Build),
+    Settings(Icons.Filled.Settings, Icons.Outlined.Settings),
 }
+
+@Composable
+private fun Destination.label(): String =
+    when (this) {
+        Destination.Home -> t("朗读", "Read")
+        Destination.Library -> t("常用语", "Phrases")
+        Destination.History -> t("历史", "History")
+        Destination.Providers -> "Provider"
+        Destination.Settings -> t("设置", "Settings")
+    }
 
 @Composable
 fun PhraseVoiceRoot(container: AppContainer) {
@@ -85,65 +98,68 @@ fun PhraseVoiceRoot(container: AppContainer) {
         "dark" -> true
         else -> isSystemDark
     }
+    val appLanguage = resolveAppLanguage(settingsState.settings.languageMode)
 
     PhraseVoiceTheme(darkTheme = isDarkTheme) {
-        SystemBarsEffect(darkTheme = isDarkTheme)
+        CompositionLocalProvider(LocalAppLanguage provides appLanguage) {
+            SystemBarsEffect(darkTheme = isDarkTheme)
 
-        Scaffold(
-            bottomBar = {
-                NavigationBar {
-                    Destination.entries.forEach { item ->
-                        val isSelected = destination == item
-                        NavigationBarItem(
-                            selected = isSelected,
-                            onClick = { destination = item },
-                            icon = {
-                                Icon(
-                                    imageVector = if (isSelected) item.selectedIcon else item.unselectedIcon,
-                                    contentDescription = item.label
-                                )
-                            },
-                            label = { Text(item.label) },
-                        )
+            Scaffold(
+                bottomBar = {
+                    NavigationBar {
+                        Destination.entries.forEach { item ->
+                            val isSelected = destination == item
+                            val label = item.label()
+                            NavigationBarItem(
+                                selected = isSelected,
+                                onClick = { destination = item },
+                                icon = {
+                                    Icon(
+                                        imageVector = if (isSelected) item.selectedIcon else item.unselectedIcon,
+                                        contentDescription = label
+                                    )
+                                },
+                                label = { Text(label) },
+                            )
+                        }
                     }
-                }
-            },
-        ) { innerPadding ->
-            AnimatedContent(
-                targetState = destination,
-                transitionSpec = {
-                    val stiffness = Spring.StiffnessLow
-                    if (targetState.ordinal > initialState.ordinal) {
-                        (slideInHorizontally { width -> (width * 0.08f).toInt() } + fadeIn(animationSpec = spring(stiffness = stiffness))) togetherWith
-                                (slideOutHorizontally { width -> -(width * 0.08f).toInt() } + fadeOut(animationSpec = spring(stiffness = stiffness)))
-                    } else {
-                        (slideInHorizontally { width -> -(width * 0.08f).toInt() } + fadeIn(animationSpec = spring(stiffness = stiffness))) togetherWith
-                                (slideOutHorizontally { width -> (width * 0.08f).toInt() } + fadeOut(animationSpec = spring(stiffness = stiffness)))
-                    }.using(
-                        SizeTransform(clip = false)
-                    )
                 },
-                label = "screenTransition"
-            ) { targetDest ->
-                val modifier = Modifier.padding(innerPadding)
-                when (targetDest) {
-                    Destination.Home -> HomeScreen(
-                        state = homeViewModel.uiState.collectAsStateWithLifecycle().value,
-                        onTextChange = homeViewModel::updateText,
-                        onProviderSelected = homeViewModel::selectProvider,
-                        onVoiceSelected = homeViewModel::selectVoice,
-                        onVoiceStyleSelected = homeViewModel::selectVoiceStyle,
-                        onSpeedChange = homeViewModel::updateSpeed,
-                        onPitchChange = homeViewModel::updatePitch,
-                        onVolumeChange = homeViewModel::updateVolume,
-                        onSpeak = homeViewModel::speak,
-                        onStop = homeViewModel::stop,
-                        onSaveAudio = homeViewModel::saveAudio,
-                        onQuickPhraseClick = { phrase ->
-                            homeViewModel.speakPhrase(phrase.id, phrase.text)
-                        },
-                        modifier = modifier,
-                    )
+            ) { innerPadding ->
+                AnimatedContent(
+                    targetState = destination,
+                    transitionSpec = {
+                        val stiffness = Spring.StiffnessLow
+                        if (targetState.ordinal > initialState.ordinal) {
+                            (slideInHorizontally { width -> (width * 0.08f).toInt() } + fadeIn(animationSpec = spring(stiffness = stiffness))) togetherWith
+                                    (slideOutHorizontally { width -> -(width * 0.08f).toInt() } + fadeOut(animationSpec = spring(stiffness = stiffness)))
+                        } else {
+                            (slideInHorizontally { width -> -(width * 0.08f).toInt() } + fadeIn(animationSpec = spring(stiffness = stiffness))) togetherWith
+                                    (slideOutHorizontally { width -> (width * 0.08f).toInt() } + fadeOut(animationSpec = spring(stiffness = stiffness)))
+                        }.using(
+                            SizeTransform(clip = false)
+                        )
+                    },
+                    label = "screenTransition"
+                ) { targetDest ->
+                    val modifier = Modifier.padding(innerPadding)
+                    when (targetDest) {
+                        Destination.Home -> HomeScreen(
+                            state = homeViewModel.uiState.collectAsStateWithLifecycle().value,
+                            onTextChange = homeViewModel::updateText,
+                            onProviderSelected = homeViewModel::selectProvider,
+                            onVoiceSelected = homeViewModel::selectVoice,
+                            onVoiceStyleSelected = homeViewModel::selectVoiceStyle,
+                            onSpeedChange = homeViewModel::updateSpeed,
+                            onPitchChange = homeViewModel::updatePitch,
+                            onVolumeChange = homeViewModel::updateVolume,
+                            onSpeak = homeViewModel::speak,
+                            onStop = homeViewModel::stop,
+                            onSaveAudio = homeViewModel::saveAudio,
+                            onQuickPhraseClick = { phrase ->
+                                homeViewModel.speakPhrase(phrase.id, phrase.text)
+                            },
+                            modifier = modifier,
+                        )
 
                     Destination.Library -> PhraseLibraryScreen(
                         state = libraryViewModel.uiState.collectAsStateWithLifecycle().value,
@@ -204,22 +220,24 @@ fun PhraseVoiceRoot(container: AppContainer) {
                         modifier = modifier,
                     )
 
-                    Destination.Settings -> SettingsScreen(
-                        state = settingsState,
-                        onDefaultProviderChange = settingsViewModel::updateDefaultProvider,
-                        onSpeedChange = settingsViewModel::updateDefaultSpeed,
-                        onPitchChange = settingsViewModel::updateDefaultPitch,
-                        onVolumeChange = settingsViewModel::updateDefaultVolume,
-                        onAutoSaveHistoryChange = settingsViewModel::updateAutoSaveHistory,
-                        onKeepAudioCacheChange = settingsViewModel::updateKeepAudioCache,
-                        onClearAudioCache = settingsViewModel::clearAudioCache,
-                        onClearDebugLogs = settingsViewModel::clearDebugLogs,
-                        onDebugLoggingEnabledChange = settingsViewModel::updateDebugLoggingEnabled,
-                        onDebugLogLevelChange = settingsViewModel::updateDebugLogLevel,
-                        onRefreshAudioCache = settingsViewModel::refreshAudioCacheInfo,
-                        onThemeModeChange = settingsViewModel::updateThemeMode,
-                        modifier = modifier,
-                    )
+                        Destination.Settings -> SettingsScreen(
+                            state = settingsState,
+                            onDefaultProviderChange = settingsViewModel::updateDefaultProvider,
+                            onSpeedChange = settingsViewModel::updateDefaultSpeed,
+                            onPitchChange = settingsViewModel::updateDefaultPitch,
+                            onVolumeChange = settingsViewModel::updateDefaultVolume,
+                            onAutoSaveHistoryChange = settingsViewModel::updateAutoSaveHistory,
+                            onKeepAudioCacheChange = settingsViewModel::updateKeepAudioCache,
+                            onClearAudioCache = settingsViewModel::clearAudioCache,
+                            onClearDebugLogs = settingsViewModel::clearDebugLogs,
+                            onDebugLoggingEnabledChange = settingsViewModel::updateDebugLoggingEnabled,
+                            onDebugLogLevelChange = settingsViewModel::updateDebugLogLevel,
+                            onRefreshAudioCache = settingsViewModel::refreshAudioCacheInfo,
+                            onThemeModeChange = settingsViewModel::updateThemeMode,
+                            onLanguageModeChange = settingsViewModel::updateLanguageMode,
+                            modifier = modifier,
+                        )
+                    }
                 }
             }
         }

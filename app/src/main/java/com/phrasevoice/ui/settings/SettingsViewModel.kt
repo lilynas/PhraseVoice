@@ -103,6 +103,10 @@ class SettingsViewModel(
         update { it.copy(themeMode = value) }
     }
 
+    fun updateLanguageMode(value: String) {
+        update { it.copy(languageMode = value) }
+    }
+
     fun updateDebugLoggingEnabled(value: Boolean) {
         update { it.copy(debugLoggingEnabled = value) }
     }

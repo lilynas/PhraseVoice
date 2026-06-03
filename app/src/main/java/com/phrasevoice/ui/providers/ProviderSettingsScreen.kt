@@ -57,6 +57,7 @@ import com.phrasevoice.data.repository.ProviderConfigRepository
 import com.phrasevoice.data.tts.EdgeForwarderCatalog
 import com.phrasevoice.data.tts.GeminiTtsCatalog
 import com.phrasevoice.data.tts.MimoTtsCatalog
+import com.phrasevoice.ui.i18n.t
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -138,7 +139,7 @@ fun ProviderSettingsScreen(
 
                 when (state.selectedProviderId) {
                     ProviderConfigRepository.ANDROID_SYSTEM -> {
-                        Text("系统 TTS 使用手机已安装的语音服务，无需 API Key。")
+                        Text(t("系统 TTS 使用手机已安装的语音服务，无需 API Key。", "System TTS uses voice services installed on this device. No API key is required."))
                     }
 
                     else -> {
@@ -148,9 +149,9 @@ fun ProviderSettingsScreen(
                             label = {
                                 Text(
                                     when {
-                                        state.isEdgeForwarder && state.hasSavedApiKey -> "Token（已保存，留空不改）"
-                                        state.isEdgeForwarder -> "Token（可选）"
-                                        state.hasSavedApiKey -> "API Key（已保存，留空不改）"
+                                        state.isEdgeForwarder && state.hasSavedApiKey -> t("Token（已保存，留空不改）", "Token (saved, leave blank to keep)")
+                                        state.isEdgeForwarder -> t("Token（可选）", "Token (optional)")
+                                        state.hasSavedApiKey -> t("API Key（已保存，留空不改）", "API Key (saved, leave blank to keep)")
                                         else -> "API Key"
                                     },
                                 )
@@ -161,15 +162,15 @@ fun ProviderSettingsScreen(
                         )
 
                         if (state.isEdgeForwarder) {
-                            Text("使用 ms-ra-forwarder 的 /api/text-to-speech 接口。Base URL 可填站点根地址或完整接口地址；如果实例启用了 TOKEN，这里填 Token。")
+                            Text(t("使用 ms-ra-forwarder 的 /api/text-to-speech 接口。Base URL 可填站点根地址或完整接口地址；如果实例启用了 TOKEN，这里填 Token。", "Uses the ms-ra-forwarder /api/text-to-speech endpoint. Base URL can be the site root or full endpoint. If TOKEN is enabled, enter it here."))
                         }
 
                         if (state.isGemini) {
-                            Text("使用 Gemini generateContent TTS 接口。Gemini 返回 PCM 音频，App 会自动封装为 WAV。")
+                            Text(t("使用 Gemini generateContent TTS 接口。Gemini 返回 PCM 音频，App 会自动封装为 WAV。", "Uses the Gemini generateContent TTS API. PCM audio is automatically wrapped as WAV."))
                         }
 
                         if (state.isMimo) {
-                            Text("使用 MiMo V2.5 TTS。预置音色可直接选择；VoiceDesign 模式会用文本描述生成专属角色声音。")
+                            Text(t("使用 MiMo V2.5 TTS。预置音色可直接选择；VoiceDesign 模式会用文本描述生成专属角色声音。", "Uses MiMo V2.5 TTS. Preset voices are selectable; VoiceDesign generates a character voice from your description."))
                         }
 
                         StyledOutlinedTextField(
@@ -206,7 +207,7 @@ fun ProviderSettingsScreen(
                                 else -> emptyList()
                             }
                             GenericCombobox(
-                                label = "模型",
+                                label = t("模型", "Model"),
                                 value = state.modelDraft,
                                 options = modelOptions,
                                 onValueChange = onModelChange,
@@ -249,7 +250,7 @@ fun ProviderSettingsScreen(
                                 else -> emptyList()
                             }
                             GenericCombobox(
-                                label = "默认 Voice",
+                                label = t("默认 Voice", "Default Voice"),
                                 value = state.voiceDraft,
                                 options = voiceOptions,
                                 onValueChange = onVoiceChange,
@@ -286,7 +287,7 @@ fun ProviderSettingsScreen(
                             modifier = Modifier.fillMaxWidth(),
                         ) {
                             Icon(Icons.Outlined.Save, contentDescription = null)
-                            Text("保存配置")
+                            Text(t("保存配置", "Save Config"))
                         }
                         OutlinedButton(
                             onClick = onTestVoice,
@@ -294,7 +295,7 @@ fun ProviderSettingsScreen(
                             modifier = Modifier.fillMaxWidth(),
                         ) {
                             Icon(Icons.Outlined.PlayArrow, contentDescription = null)
-                            Text(if (state.isTesting) "试听中" else "保存并试听")
+                            Text(if (state.isTesting) t("试听中", "Testing") else t("保存并试听", "Save & Test"))
                         }
                     }
                 }
@@ -310,9 +311,9 @@ private fun MimoStreamingFields(
 ) {
     Row(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.weight(1f)) {
-            Text("MiMo 流式合成")
+            Text(t("MiMo 流式合成", "MiMo Streaming Synthesis"))
             Text(
-                "使用 pcm16 流式响应，完成后自动封装为 WAV。",
+                t("使用 pcm16 流式响应，完成后自动封装为 WAV。", "Uses pcm16 streaming responses and wraps the result as WAV."),
                 style = MaterialTheme.typography.bodySmall,
             )
         }
@@ -334,7 +335,7 @@ private fun MimoVoiceDesignPresetDropdown(
     val selectedName = state.mimoVoiceDesignPresetsDraft
         .firstOrNull { it.id == state.mimoSelectedVoiceDesignPresetIdDraft }
         ?.name
-        ?: "默认角色"
+        ?: t("默认角色", "Default Character")
 
     ExposedDropdownMenuBox(
         expanded = expanded,
@@ -347,7 +348,7 @@ private fun MimoVoiceDesignPresetDropdown(
             readOnly = true,
             value = selectedName,
             onValueChange = {},
-            label = { Text("角色声音") },
+            label = { Text(t("角色声音", "Character Voice")) },
             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
         )
         ExposedDropdownMenu(
@@ -397,14 +398,14 @@ private fun MimoVoiceDesignFields(
     StyledOutlinedTextField(
         value = state.mimoVoiceDesignPresetNameDraft,
         onValueChange = onMimoVoiceDesignPresetNameChange,
-        label = { Text("角色名称") },
+        label = { Text(t("角色名称", "Character Name")) },
         singleLine = true,
         modifier = Modifier.fillMaxWidth(),
     )
     StyledOutlinedTextField(
         value = state.voiceDraft,
         onValueChange = onVoiceChange,
-        label = { Text("VoiceDesign 音色描述") },
+        label = { Text(t("VoiceDesign 音色描述", "VoiceDesign Description")) },
         minLines = 4,
         modifier = Modifier
             .fillMaxWidth()
@@ -413,7 +414,7 @@ private fun MimoVoiceDesignFields(
     StyledOutlinedTextField(
         value = state.mimoPromptOptimizerModelDraft,
         onValueChange = onMimoPromptOptimizerModelChange,
-        label = { Text("描述优化模型") },
+        label = { Text(t("描述优化模型", "Prompt Optimizer Model")) },
         singleLine = true,
         modifier = Modifier.fillMaxWidth(),
     )
@@ -425,7 +426,7 @@ private fun MimoVoiceDesignFields(
         modifier = Modifier.fillMaxWidth(),
     ) {
         Icon(Icons.Outlined.Tune, contentDescription = null)
-        Text(if (state.isOptimizingVoiceDesign) "优化中" else "优化音色描述")
+        Text(if (state.isOptimizingVoiceDesign) t("优化中", "Optimizing") else t("优化音色描述", "Optimize Voice Description"))
     }
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -437,7 +438,7 @@ private fun MimoVoiceDesignFields(
             modifier = Modifier.weight(1f),
         ) {
             Icon(Icons.Outlined.Add, contentDescription = null)
-            Text("新增角色")
+            Text(t("新增角色", "New Character"))
         }
         OutlinedButton(
             onClick = onSaveMimoVoiceDesignPreset,
@@ -445,7 +446,7 @@ private fun MimoVoiceDesignFields(
             modifier = Modifier.weight(1f),
         ) {
             Icon(Icons.Outlined.Save, contentDescription = null)
-            Text("暂存角色")
+            Text(t("暂存角色", "Save Character"))
         }
     }
     OutlinedButton(
@@ -456,13 +457,16 @@ private fun MimoVoiceDesignFields(
         modifier = Modifier.fillMaxWidth(),
     ) {
         Icon(Icons.Outlined.Delete, contentDescription = null)
-        Text("删除当前角色")
+        Text(t("删除当前角色", "Delete Current Character"))
     }
     Row(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.weight(1f)) {
-            Text("试听文本智能优化")
+            Text(t("试听文本智能优化", "Smart Preview Text Optimization"))
             Text(
-                "开启后 MiMo 会在 VoiceDesign 试听/朗读时优化目标文本；音色描述仍以上方内容为准。",
+                t(
+                    "开启后 MiMo 会在 VoiceDesign 试听/朗读时优化目标文本；音色描述仍以上方内容为准。",
+                    "When enabled, MiMo optimizes the target text for VoiceDesign preview/reading; the voice description above remains unchanged.",
+                ),
                 style = MaterialTheme.typography.bodySmall,
             )
         }
@@ -496,7 +500,7 @@ private fun ProviderSelectorDropdown(
             readOnly = true,
             value = selectedLabel,
             onValueChange = {},
-            label = { Text("选择 Provider 声音引擎") },
+            label = { Text(t("选择 Provider 声音引擎", "Select Provider Voice Engine")) },
             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
             leadingIcon = {
                 selectedConfig?.let { ProviderIcon(it.providerId) }
@@ -533,7 +537,7 @@ private fun ProviderSelectorDropdown(
                                 )
                             }
                             Text(
-                                text = if (config.enabled) "已启用" else "未启用",
+                                text = if (config.enabled) t("已启用", "Enabled") else t("未启用", "Disabled"),
                                 style = MaterialTheme.typography.bodyMedium.copy(
                                     fontWeight = FontWeight.Bold,
                                     color = if (config.enabled) {
@@ -591,7 +595,7 @@ private fun EdgeForwarderVoiceDropdown(
             readOnly = true,
             value = selectedName,
             onValueChange = {},
-            label = { Text("默认发音人") },
+            label = { Text(t("默认发音人", "Default Speaker")) },
             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
         )
         ExposedDropdownMenu(
@@ -640,7 +644,7 @@ private fun GeminiVoiceDropdown(
             readOnly = true,
             value = selectedName,
             onValueChange = {},
-            label = { Text("默认 Voice") },
+            label = { Text(t("默认 Voice", "Default Voice")) },
             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
         )
         ExposedDropdownMenu(
@@ -689,7 +693,7 @@ private fun MimoModelDropdown(
             readOnly = true,
             value = selectedName,
             onValueChange = {},
-            label = { Text("模型") },
+            label = { Text(t("模型", "Model")) },
             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
         )
         ExposedDropdownMenu(
@@ -740,7 +744,7 @@ private fun MimoVoiceDropdown(
             readOnly = true,
             value = selectedName,
             onValueChange = {},
-            label = { Text("默认 Voice") },
+            label = { Text(t("默认 Voice", "Default Voice")) },
             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
         )
         ExposedDropdownMenu(
@@ -785,7 +789,7 @@ private fun CustomHttpFields(
 
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text(
-            text = "一键填充常用接口模板",
+            text = t("一键填充常用接口模板", "One-tap Common API Templates"),
             style = MaterialTheme.typography.titleMedium,
             color = MaterialTheme.colorScheme.primary,
         )
@@ -795,7 +799,7 @@ private fun CustomHttpFields(
         ) {
             AssistChip(
                 onClick = { onApplyTemplate("OpenAI") },
-                label = { Text("OpenAI / 兼容") }
+                label = { Text(t("OpenAI / 兼容", "OpenAI / Compatible")) }
             )
             AssistChip(
                 onClick = { onApplyTemplate("MiniMax") },
@@ -803,7 +807,7 @@ private fun CustomHttpFields(
             )
             AssistChip(
                 onClick = { onApplyTemplate("Volcengine") },
-                label = { Text("火山引擎") }
+                label = { Text(t("火山引擎", "Volcengine")) }
             )
         }
 
@@ -828,13 +832,13 @@ private fun CustomHttpFields(
                         .clickable { showAdvanced = !showAdvanced }
                 ) {
                     Text(
-                        text = "高级 HTTP 协议参数设置",
+                        text = t("高级 HTTP 协议参数设置", "Advanced HTTP Protocol Settings"),
                         style = MaterialTheme.typography.titleMedium,
                         modifier = Modifier.weight(1f)
                     )
                     Icon(
                         imageVector = if (showAdvanced) Icons.Outlined.ExpandLess else Icons.Outlined.ExpandMore,
-                        contentDescription = if (showAdvanced) "收起" else "展开"
+                        contentDescription = if (showAdvanced) t("收起", "Collapse") else t("展开", "Expand")
                     )
                 }
 
@@ -874,7 +878,7 @@ private fun CustomHttpFields(
                     StyledOutlinedTextField(
                         value = state.headersDraft,
                         onValueChange = onHeadersChange,
-                        label = { Text("Headers 模板") },
+                        label = { Text(t("Headers 模板", "Headers Template")) },
                         minLines = 3,
                         modifier = Modifier
                             .fillMaxWidth()
@@ -883,7 +887,7 @@ private fun CustomHttpFields(
                     StyledOutlinedTextField(
                         value = state.bodyDraft,
                         onValueChange = onBodyChange,
-                        label = { Text("JSON Body 模板") },
+                        label = { Text(t("JSON Body 模板", "JSON Body Template")) },
                         minLines = 5,
                         modifier = Modifier
                             .fillMaxWidth()
@@ -901,7 +905,7 @@ private fun CustomHttpFields(
                             readOnly = true,
                             value = responseTypeLabel(state.responseTypeDraft),
                             onValueChange = {},
-                            label = { Text("Response 类型") },
+                            label = { Text(t("Response 类型", "Response Type")) },
                             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = responseExpanded) },
                         )
                         ExposedDropdownMenu(
@@ -924,7 +928,7 @@ private fun CustomHttpFields(
                         StyledOutlinedTextField(
                             value = state.responseFieldDraft,
                             onValueChange = onResponseFieldChange,
-                            label = { Text("JSON 字段路径") },
+                            label = { Text(t("JSON 字段路径", "JSON Field Path")) },
                             singleLine = true,
                             modifier = Modifier.fillMaxWidth(),
                         )

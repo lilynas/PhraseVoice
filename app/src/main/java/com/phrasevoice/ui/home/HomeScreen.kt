@@ -73,6 +73,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.phrasevoice.data.model.Phrase
+import com.phrasevoice.ui.i18n.t
 
 @Composable
 fun VoiceWaveIndicator(
@@ -136,6 +137,7 @@ fun HomeScreen(
     val canRunTts = state.status != HomeStatus.Loading &&
             state.status != HomeStatus.Saving &&
             !androidTtsUnavailable
+    val shareTitle = t("分享音频", "Share Audio")
 
     Column(
         modifier = modifier
@@ -163,8 +165,8 @@ fun HomeScreen(
         OutlinedTextField(
             value = state.text,
             onValueChange = onTextChange,
-            label = { Text("朗读文本") },
-            placeholder = { Text("请输入要朗读的文本...", color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)) },
+            label = { Text(t("朗读文本", "Text to Read")) },
+            placeholder = { Text(t("请输入要朗读的文本...", "Enter text to read..."), color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)) },
             minLines = 8,
             maxLines = 16,
             shape = RoundedCornerShape(20.dp),
@@ -209,9 +211,9 @@ fun HomeScreen(
                         }
                         Text(
                             text = when (state.status) {
-                                HomeStatus.Loading -> "准备中..."
-                                HomeStatus.Playing -> "播放中"
-                                else -> "开始朗读"
+                                HomeStatus.Loading -> t("准备中...", "Preparing...")
+                                HomeStatus.Playing -> t("播放中", "Playing")
+                                else -> t("开始朗读", "Read")
                             },
                             fontWeight = FontWeight.Bold
                         )
@@ -228,7 +230,7 @@ fun HomeScreen(
                             )
                         ) {
                             Icon(Icons.Outlined.Stop, contentDescription = null, modifier = Modifier.padding(end = 4.dp))
-                            Text("停止", fontWeight = FontWeight.Bold)
+                            Text(t("停止", "Stop"), fontWeight = FontWeight.Bold)
                         }
                     } else {
                         OutlinedButton(
@@ -239,7 +241,7 @@ fun HomeScreen(
                             modifier = Modifier.weight(1f).height(52.dp)
                         ) {
                             Icon(Icons.Outlined.Download, contentDescription = null, modifier = Modifier.padding(end = 4.dp))
-                            Text(if (state.status == HomeStatus.Saving) "保存中" else "保存", fontWeight = FontWeight.SemiBold)
+                            Text(if (state.status == HomeStatus.Saving) t("保存中", "Saving") else t("保存", "Save"), fontWeight = FontWeight.SemiBold)
                         }
                     }
                 }
@@ -251,6 +253,7 @@ fun HomeScreen(
                                 context = context,
                                 uriString = state.lastAudioUri,
                                 mimeType = state.lastAudioMimeType,
+                                chooserTitle = shareTitle,
                             )
                         },
                         shape = RoundedCornerShape(16.dp),
@@ -258,7 +261,7 @@ fun HomeScreen(
                         modifier = Modifier.fillMaxWidth().height(48.dp)
                     ) {
                         Icon(Icons.Outlined.Share, contentDescription = null, modifier = Modifier.padding(end = 8.dp))
-                        Text("分享生成的音频", fontWeight = FontWeight.SemiBold)
+                        Text(t("分享生成的音频", "Share Generated Audio"), fontWeight = FontWeight.SemiBold)
                     }
                 }
             }
@@ -274,7 +277,14 @@ fun HomeScreen(
             ) {
                 Column(modifier = Modifier.padding(12.dp)) {
                     Text(
-                        text = if (androidTtsUnavailable) "系统 TTS 未就绪，请在系统设置中启用或更换 Provider" else state.errorMessage ?: "发生未知错误",
+                        text = if (androidTtsUnavailable) {
+                            t(
+                                "系统 TTS 未就绪，请在系统设置中启用或更换 Provider",
+                                "System TTS is not ready. Enable it in system settings or switch Provider.",
+                            )
+                        } else {
+                            state.errorMessage ?: t("发生未知错误", "Unknown error")
+                        },
                         color = MaterialTheme.colorScheme.onErrorContainer,
                         style = MaterialTheme.typography.bodyMedium
                     )
@@ -286,7 +296,7 @@ fun HomeScreen(
         if (state.quickPhrases.isNotEmpty()) {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(
-                    text = "常用语快捷朗读",
+                    text = t("常用语快捷朗读", "Quick Phrases"),
                     style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                     color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.8f)
                 )
@@ -330,7 +340,7 @@ fun HomeScreen(
                 verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
                 Text(
-                    text = "声音引擎配置",
+                    text = t("声音引擎配置", "Voice Engine"),
                     style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                     color = MaterialTheme.colorScheme.primary
                 )
@@ -368,12 +378,12 @@ fun HomeScreen(
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 Text(
-                    text = "声音属性设置",
+                    text = t("声音属性设置", "Voice Properties"),
                     style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                     color = MaterialTheme.colorScheme.primary
                 )
                 SliderItem(
-                    label = "语速",
+                    label = t("语速", "Speed"),
                     value = state.speed,
                     range = 0.5f..2.0f,
                     startIcon = Icons.Outlined.DirectionsWalk,
@@ -381,7 +391,7 @@ fun HomeScreen(
                     onChange = onSpeedChange
                 )
                 SliderItem(
-                    label = "音调",
+                    label = t("音调", "Pitch"),
                     value = state.pitch,
                     range = 0.5f..2.0f,
                     startIcon = Icons.Outlined.ArrowDownward,
@@ -389,7 +399,7 @@ fun HomeScreen(
                     onChange = onPitchChange
                 )
                 SliderItem(
-                    label = "音量",
+                    label = t("音量", "Volume"),
                     value = state.volume,
                     range = 0.0f..1.0f,
                     startIcon = Icons.AutoMirrored.Outlined.VolumeMute,
@@ -438,8 +448,9 @@ private fun ProviderDropdown(
             state.providers.forEach { provider ->
                 DropdownMenuItem(
                     text = {
+                        val note = if (provider.note == "未启用") t("未启用", "Disabled") else provider.note
                         Text(
-                            text = listOfNotNull(provider.name, provider.note).joinToString(" · "),
+                            text = listOfNotNull(provider.name, note).joinToString(" · "),
                         )
                     },
                     onClick = {
@@ -473,7 +484,7 @@ private fun VoiceStyleDropdown(
             readOnly = true,
             value = selected?.name.orEmpty(),
             onValueChange = {},
-            label = { Text("风格") },
+            label = { Text(t("风格", "Style")) },
             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
             shape = RoundedCornerShape(16.dp),
             colors = OutlinedTextFieldDefaults.colors(
@@ -664,6 +675,7 @@ private fun shareAudio(
     context: Context,
     uriString: String,
     mimeType: String?,
+    chooserTitle: String,
 ) {
     val uri = Uri.parse(uriString)
     val shareIntent = Intent(Intent.ACTION_SEND).apply {
@@ -671,5 +683,5 @@ private fun shareAudio(
         putExtra(Intent.EXTRA_STREAM, uri)
         addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
     }
-    context.startActivity(Intent.createChooser(shareIntent, "分享音频"))
+    context.startActivity(Intent.createChooser(shareIntent, chooserTitle))
 }
