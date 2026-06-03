@@ -582,11 +582,11 @@ private fun AboutDialog(
                 )
                 AboutLinkItem(
                     label = "项目开源地址",
-                    value = "Lilynas/PhraseVoice",
+                    value = "PhraseVoice",
                     onClick = { runCatching { uriHandler.openUri("https://github.com/lilynas/PhraseVoice") } }
                 )
                 AboutLinkItem(
-                    label = "问题反馈 (Issues)",
+                    label = "问题反馈",
                     value = "提交 Issue",
                     onClick = { runCatching { uriHandler.openUri("https://github.com/lilynas/PhraseVoice/issues") } }
                 )
