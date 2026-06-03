@@ -376,9 +376,7 @@ fun HomeScreen(
                                 )
                             },
                             shape = RoundedCornerShape(12.dp),
-                            border = SuggestionChipDefaults.suggestionChipBorder(
-                                borderColor = MaterialTheme.colorScheme.outline
-                            ),
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
                             colors = SuggestionChipDefaults.suggestionChipColors(
                                 containerColor = MaterialTheme.colorScheme.surface
                             )
