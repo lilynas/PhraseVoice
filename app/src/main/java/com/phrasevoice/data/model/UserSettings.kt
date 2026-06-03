@@ -10,4 +10,5 @@ data class UserSettings(
     val defaultVolume: Float = 1.0f,
     val autoSaveHistory: Boolean = true,
     val keepAudioCache: Boolean = true,
+    val themeMode: String = "system",
 )

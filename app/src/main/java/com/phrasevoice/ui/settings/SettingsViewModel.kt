@@ -87,6 +87,10 @@ class SettingsViewModel(
         update { it.copy(keepAudioCache = value) }
     }
 
+    fun updateThemeMode(value: String) {
+        update { it.copy(themeMode = value) }
+    }
+
     fun clearDebugLogs() {
         AppLogger.clear()
     }

@@ -27,8 +27,11 @@ import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.foundation.clickable
@@ -109,7 +112,12 @@ fun ProviderSettingsScreen(
             )
         }
 
-        Card(modifier = Modifier.fillMaxWidth()) {
+        Card(
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+            shape = RoundedCornerShape(24.dp),
+            modifier = Modifier.fillMaxWidth()
+        ) {
             Column(
                 modifier = Modifier.padding(12.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -133,7 +141,7 @@ fun ProviderSettingsScreen(
                     }
 
                     else -> {
-                        OutlinedTextField(
+                        StyledOutlinedTextField(
                             value = state.apiKeyDraft,
                             onValueChange = onApiKeyChange,
                             label = {
@@ -163,7 +171,7 @@ fun ProviderSettingsScreen(
                             Text("使用 MiMo V2.5 TTS。预置音色可直接选择；VoiceDesign 模式会用文本描述生成专属角色声音。")
                         }
 
-                        OutlinedTextField(
+                        StyledOutlinedTextField(
                             value = state.baseUrlDraft,
                             onValueChange = onBaseUrlChange,
                             label = {
@@ -190,7 +198,7 @@ fun ProviderSettingsScreen(
                                 onMimoUseStreamingChange = onMimoUseStreamingChange,
                             )
                         } else if (!state.isEdgeForwarder) {
-                            OutlinedTextField(
+                            StyledOutlinedTextField(
                                 value = state.modelDraft,
                                 onValueChange = onModelChange,
                                 label = { Text("模型") },
@@ -228,7 +236,7 @@ fun ProviderSettingsScreen(
                                 onVoiceChange = onVoiceChange,
                             )
                         } else {
-                            OutlinedTextField(
+                            StyledOutlinedTextField(
                                 value = state.voiceDraft,
                                 onValueChange = onVoiceChange,
                                 label = { Text("默认 Voice") },
@@ -309,7 +317,7 @@ private fun MimoVoiceDesignPresetDropdown(
         expanded = expanded,
         onExpandedChange = { expanded = !expanded },
     ) {
-        OutlinedTextField(
+        StyledOutlinedTextField(
             modifier = Modifier
                 .menuAnchor()
                 .fillMaxWidth(),
@@ -363,14 +371,14 @@ private fun MimoVoiceDesignFields(
         state = state,
         onMimoVoiceDesignPresetSelected = onMimoVoiceDesignPresetSelected,
     )
-    OutlinedTextField(
+    StyledOutlinedTextField(
         value = state.mimoVoiceDesignPresetNameDraft,
         onValueChange = onMimoVoiceDesignPresetNameChange,
         label = { Text("角色名称") },
         singleLine = true,
         modifier = Modifier.fillMaxWidth(),
     )
-    OutlinedTextField(
+    StyledOutlinedTextField(
         value = state.voiceDraft,
         onValueChange = onVoiceChange,
         label = { Text("VoiceDesign 音色描述") },
@@ -379,7 +387,7 @@ private fun MimoVoiceDesignFields(
             .fillMaxWidth()
             .heightIn(min = 136.dp),
     )
-    OutlinedTextField(
+    StyledOutlinedTextField(
         value = state.mimoPromptOptimizerModelDraft,
         onValueChange = onMimoPromptOptimizerModelChange,
         label = { Text("描述优化模型") },
@@ -499,7 +507,7 @@ private fun EdgeForwarderVoiceDropdown(
         expanded = expanded,
         onExpandedChange = { expanded = !expanded },
     ) {
-        OutlinedTextField(
+        StyledOutlinedTextField(
             modifier = Modifier
                 .menuAnchor()
                 .fillMaxWidth(),
@@ -548,7 +556,7 @@ private fun GeminiVoiceDropdown(
         expanded = expanded,
         onExpandedChange = { expanded = !expanded },
     ) {
-        OutlinedTextField(
+        StyledOutlinedTextField(
             modifier = Modifier
                 .menuAnchor()
                 .fillMaxWidth(),
@@ -597,7 +605,7 @@ private fun MimoModelDropdown(
         expanded = expanded,
         onExpandedChange = { expanded = !expanded },
     ) {
-        OutlinedTextField(
+        StyledOutlinedTextField(
             modifier = Modifier
                 .menuAnchor()
                 .fillMaxWidth(),
@@ -648,7 +656,7 @@ private fun MimoVoiceDropdown(
         expanded = expanded,
         onExpandedChange = { expanded = !expanded },
     ) {
-        OutlinedTextField(
+        StyledOutlinedTextField(
             modifier = Modifier
                 .menuAnchor()
                 .fillMaxWidth(),
@@ -724,8 +732,10 @@ private fun CustomHttpFields(
 
         Card(
             colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+                containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.15f)
             ),
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+            shape = RoundedCornerShape(20.dp),
             modifier = Modifier.fillMaxWidth()
         ) {
             Column(
@@ -758,7 +768,7 @@ private fun CustomHttpFields(
                         expanded = methodExpanded,
                         onExpandedChange = { methodExpanded = !methodExpanded },
                     ) {
-                        OutlinedTextField(
+                        StyledOutlinedTextField(
                             modifier = Modifier
                                 .menuAnchor()
                                 .fillMaxWidth(),
@@ -784,7 +794,7 @@ private fun CustomHttpFields(
                         }
                     }
 
-                    OutlinedTextField(
+                    StyledOutlinedTextField(
                         value = state.headersDraft,
                         onValueChange = onHeadersChange,
                         label = { Text("Headers 模板") },
@@ -793,7 +803,7 @@ private fun CustomHttpFields(
                             .fillMaxWidth()
                             .heightIn(min = 104.dp),
                     )
-                    OutlinedTextField(
+                    StyledOutlinedTextField(
                         value = state.bodyDraft,
                         onValueChange = onBodyChange,
                         label = { Text("JSON Body 模板") },
@@ -807,7 +817,7 @@ private fun CustomHttpFields(
                         expanded = responseExpanded,
                         onExpandedChange = { responseExpanded = !responseExpanded },
                     ) {
-                        OutlinedTextField(
+                        StyledOutlinedTextField(
                             modifier = Modifier
                                 .menuAnchor()
                                 .fillMaxWidth(),
@@ -834,7 +844,7 @@ private fun CustomHttpFields(
                     }
 
                     if (state.responseTypeDraft != CustomHttpResponseType.RAW_AUDIO) {
-                        OutlinedTextField(
+                        StyledOutlinedTextField(
                             value = state.responseFieldDraft,
                             onValueChange = onResponseFieldChange,
                             label = { Text("JSON 字段路径") },
@@ -865,3 +875,42 @@ private fun responseTypeLabel(type: CustomHttpResponseType): String =
         CustomHttpResponseType.JSON_BASE64_FIELD -> "JSON base64 field"
         CustomHttpResponseType.JSON_URL_FIELD -> "JSON URL field"
     }
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun StyledOutlinedTextField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    readOnly: Boolean = false,
+    label: @Composable (() -> Unit)? = null,
+    placeholder: @Composable (() -> Unit)? = null,
+    leadingIcon: @Composable (() -> Unit)? = null,
+    trailingIcon: @Composable (() -> Unit)? = null,
+    visualTransformation: androidx.compose.ui.text.input.VisualTransformation = androidx.compose.ui.text.input.VisualTransformation.None,
+    singleLine: Boolean = false,
+    minLines: Int = 1,
+) {
+    OutlinedTextField(
+        value = value,
+        onValueChange = onValueChange,
+        modifier = modifier,
+        enabled = enabled,
+        readOnly = readOnly,
+        label = label,
+        placeholder = placeholder,
+        leadingIcon = leadingIcon,
+        trailingIcon = trailingIcon,
+        visualTransformation = visualTransformation,
+        singleLine = singleLine,
+        minLines = minLines,
+        shape = RoundedCornerShape(16.dp),
+        colors = OutlinedTextFieldDefaults.colors(
+            focusedBorderColor = MaterialTheme.colorScheme.primary,
+            unfocusedBorderColor = MaterialTheme.colorScheme.outline,
+            focusedContainerColor = MaterialTheme.colorScheme.surface,
+            unfocusedContainerColor = MaterialTheme.colorScheme.surface,
+        )
+    )
+}

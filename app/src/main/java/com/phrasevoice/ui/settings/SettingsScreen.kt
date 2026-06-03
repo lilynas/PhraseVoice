@@ -1,23 +1,46 @@
 package com.phrasevoice.ui.settings
 
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.VolumeMute
+import androidx.compose.material.icons.automirrored.outlined.VolumeUp
+import androidx.compose.material.icons.outlined.ArrowDownward
+import androidx.compose.material.icons.outlined.ArrowUpward
+import androidx.compose.material.icons.outlined.BrightnessAuto
+import androidx.compose.material.icons.outlined.DarkMode
+import androidx.compose.material.icons.outlined.DirectionsRun
+import androidx.compose.material.icons.outlined.DirectionsWalk
+import androidx.compose.material.icons.outlined.LightMode
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -27,8 +50,11 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.phrasevoice.debug.DebugLogEntry
@@ -49,6 +75,7 @@ fun SettingsScreen(
     onClearAudioCache: () -> Unit,
     onClearDebugLogs: () -> Unit,
     onRefreshAudioCache: () -> Unit,
+    onThemeModeChange: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     LaunchedEffect(Unit) {
@@ -61,31 +88,109 @@ fun SettingsScreen(
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
             .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        Text(text = "设置", style = MaterialTheme.typography.headlineMedium)
+        Text(
+            text = "设置",
+            style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold)
+        )
+
         SettingsCard {
-            Text(text = "默认 Provider", style = MaterialTheme.typography.titleMedium)
+            Text(
+                text = "主题设置",
+                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                color = MaterialTheme.colorScheme.primary
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                listOf(
+                    Triple("system", "系统默认", Icons.Outlined.BrightnessAuto),
+                    Triple("light", "浅色 (日系奶白)", Icons.Outlined.LightMode),
+                    Triple("dark", "深色 (OLED完全黑)", Icons.Outlined.DarkMode)
+                ).forEach { (mode, label, icon) ->
+                    val isSelected = settings.themeMode == mode
+                    FilterChip(
+                        selected = isSelected,
+                        onClick = { onThemeModeChange(mode) },
+                        label = { Text(label) },
+                        leadingIcon = {
+                            Icon(
+                                imageVector = icon,
+                                contentDescription = null,
+                                modifier = Modifier.size(16.dp)
+                            )
+                        },
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+            }
+        }
+
+        SettingsCard {
+            Text(
+                text = "默认 Provider",
+                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                color = MaterialTheme.colorScheme.primary
+            )
             DefaultProviderDropdown(
                 providers = state.providers,
                 selectedProviderId = settings.defaultProviderId,
                 onDefaultProviderChange = onDefaultProviderChange,
             )
         }
+
         SettingsCard {
-            SliderSetting("默认语速", settings.defaultSpeed, 0.5f..2.0f, onSpeedChange)
-            SliderSetting("默认音调", settings.defaultPitch, 0.5f..2.0f, onPitchChange)
-            SliderSetting("默认音量", settings.defaultVolume, 0.0f..1.0f, onVolumeChange)
+            Text(
+                text = "发音属性默认值",
+                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                color = MaterialTheme.colorScheme.primary
+            )
+            SliderSetting(
+                label = "默认语速",
+                value = settings.defaultSpeed,
+                range = 0.5f..2.0f,
+                startIcon = Icons.Outlined.DirectionsWalk,
+                endIcon = Icons.Outlined.DirectionsRun,
+                onChange = onSpeedChange
+            )
+            Spacer(modifier = Modifier.height(10.dp))
+            SliderSetting(
+                label = "默认音调",
+                value = settings.defaultPitch,
+                range = 0.5f..2.0f,
+                startIcon = Icons.Outlined.ArrowDownward,
+                endIcon = Icons.Outlined.ArrowUpward,
+                onChange = onPitchChange
+            )
+            Spacer(modifier = Modifier.height(10.dp))
+            SliderSetting(
+                label = "默认音量",
+                value = settings.defaultVolume,
+                range = 0.0f..1.0f,
+                startIcon = Icons.AutoMirrored.Outlined.VolumeMute,
+                endIcon = Icons.AutoMirrored.Outlined.VolumeUp,
+                onChange = onVolumeChange
+            )
         }
+
         SettingsCard {
+            Text(
+                text = "存储与历史",
+                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                color = MaterialTheme.colorScheme.primary
+            )
             SwitchSetting("自动保存历史", settings.autoSaveHistory, onAutoSaveHistoryChange)
             SwitchSetting("保留音频缓存", settings.keepAudioCache, onKeepAudioCacheChange)
         }
+
         AudioCacheCard(
             state = state,
             onClearAudioCache = onClearAudioCache,
             onRefreshAudioCache = onRefreshAudioCache,
         )
+
         DebugLogCard(
             logs = state.debugLogs,
             onClearDebugLogs = onClearDebugLogs,
@@ -115,6 +220,13 @@ private fun DefaultProviderDropdown(
             value = selected?.name ?: selectedProviderId,
             onValueChange = {},
             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+            shape = RoundedCornerShape(16.dp),
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedBorderColor = MaterialTheme.colorScheme.primary,
+                unfocusedBorderColor = MaterialTheme.colorScheme.outline,
+                focusedContainerColor = MaterialTheme.colorScheme.surface,
+                unfocusedContainerColor = MaterialTheme.colorScheme.surface,
+            )
         )
         ExposedDropdownMenu(
             expanded = expanded,
@@ -142,28 +254,124 @@ private fun DefaultProviderDropdown(
 
 @Composable
 private fun SettingsCard(content: @Composable ColumnScope.() -> Unit) {
-    Card(modifier = Modifier.fillMaxWidth()) {
+    Card(
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surface
+        ),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+        shape = RoundedCornerShape(24.dp),
+        modifier = Modifier.fillMaxWidth()
+    ) {
         Column(
-            modifier = Modifier.padding(12.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
             content = content,
         )
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun SliderSetting(
     label: String,
     value: Float,
     range: ClosedFloatingPointRange<Float>,
+    startIcon: ImageVector,
+    endIcon: ImageVector,
     onChange: (Float) -> Unit,
 ) {
     Column {
-        Row(modifier = Modifier.fillMaxWidth()) {
-            Text(text = label, modifier = Modifier.weight(1f))
-            Text(text = "%.2f".format(value))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                text = label,
+                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Spacer(modifier = Modifier.weight(1f))
+            Text(
+                text = "%.2f".format(value),
+                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                color = MaterialTheme.colorScheme.primary
+            )
         }
-        Slider(value = value, onValueChange = onChange, valueRange = range)
+
+        Spacer(modifier = Modifier.height(4.dp))
+
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(
+                imageVector = startIcon,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                modifier = Modifier.size(18.dp)
+            )
+
+            val interactionSource = remember { MutableInteractionSource() }
+            val isPressed by interactionSource.collectIsPressedAsState()
+            val thumbSizeAnim by animateDpAsState(
+                targetValue = if (isPressed) 22.dp else 16.dp,
+                label = "thumbSize"
+            )
+
+            val primaryColor = MaterialTheme.colorScheme.primary
+            val tertiaryColor = MaterialTheme.colorScheme.tertiary
+            val inactiveColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.15f)
+
+            Slider(
+                value = value,
+                onValueChange = onChange,
+                valueRange = range,
+                interactionSource = interactionSource,
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(horizontal = 8.dp),
+                thumb = { _ ->
+                    SliderDefaults.Thumb(
+                        interactionSource = interactionSource,
+                        colors = SliderDefaults.colors(thumbColor = primaryColor),
+                        modifier = Modifier.size(thumbSizeAnim)
+                    )
+                },
+                track = { sliderState ->
+                    val fraction = (sliderState.value - sliderState.valueRange.start) /
+                            (sliderState.valueRange.endInclusive - sliderState.valueRange.start)
+                    androidx.compose.foundation.Canvas(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(6.dp)
+                    ) {
+                        val width = size.width
+                        val height = size.height
+                        val centerY = height / 2f
+                        val cornerRadius = androidx.compose.ui.geometry.CornerRadius(height / 2f, height / 2f)
+
+                        // Inactive track
+                        drawRoundRect(
+                            color = inactiveColor,
+                            topLeft = androidx.compose.ui.geometry.Offset(0f, centerY - 3.dp.toPx()),
+                            size = androidx.compose.ui.geometry.Size(width, 6.dp.toPx()),
+                            cornerRadius = cornerRadius
+                        )
+
+                        // Active track with linear gradient!
+                        drawRoundRect(
+                            brush = androidx.compose.ui.graphics.Brush.linearGradient(
+                                colors = listOf(primaryColor, tertiaryColor)
+                            ),
+                            topLeft = androidx.compose.ui.geometry.Offset(0f, centerY - 3.dp.toPx()),
+                            size = androidx.compose.ui.geometry.Size(width * fraction, 6.dp.toPx()),
+                            cornerRadius = cornerRadius
+                        )
+                    }
+                }
+            )
+
+            Icon(
+                imageVector = endIcon,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(18.dp)
+            )
+        }
     }
 }
 
@@ -173,8 +381,15 @@ private fun SwitchSetting(
     value: Boolean,
     onChange: (Boolean) -> Unit,
 ) {
-    Row(modifier = Modifier.fillMaxWidth()) {
-        Text(text = label, modifier = Modifier.weight(1f))
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodyMedium,
+            modifier = Modifier.weight(1f)
+        )
         Switch(checked = value, onCheckedChange = onChange)
     }
 }

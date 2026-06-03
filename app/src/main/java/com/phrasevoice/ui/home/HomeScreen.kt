@@ -4,9 +4,18 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -15,6 +24,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
@@ -31,7 +41,6 @@ import androidx.compose.material.icons.outlined.Download
 import androidx.compose.material.icons.outlined.PlayArrow
 import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material.icons.outlined.Stop
-import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -39,15 +48,16 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
+import androidx.compose.material3.SuggestionChip
+import androidx.compose.material3.SuggestionChipDefaults
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -55,12 +65,53 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.phrasevoice.data.model.Phrase
+
+@Composable
+fun VoiceWaveIndicator(
+    color: Color,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier,
+        horizontalArrangement = Arrangement.spacedBy(3.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        val transition = rememberInfiniteTransition(label = "wave")
+        val heights = listOf(0.3f, 0.9f, 0.5f)
+        val durations = listOf(500, 700, 600)
+        
+        heights.zip(durations).forEach { (initialHeight, duration) ->
+            val scale by transition.animateFloat(
+                initialValue = initialHeight,
+                targetValue = 1f,
+                animationSpec = infiniteRepeatable(
+                    animation = tween(duration, easing = FastOutSlowInEasing),
+                    repeatMode = RepeatMode.Reverse
+                ),
+                label = "scale"
+            )
+            Canvas(
+                modifier = Modifier
+                    .size(width = 3.dp, height = 14.dp)
+            ) {
+                val h = size.height * scale
+                drawRoundRect(
+                    color = color,
+                    topLeft = androidx.compose.ui.geometry.Offset(0f, (size.height - h) / 2f),
+                    size = androidx.compose.ui.geometry.Size(size.width, h),
+                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(size.width / 2)
+                )
+            }
+        }
+    }
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -82,31 +133,48 @@ fun HomeScreen(
     val context = LocalContext.current
     val androidTtsUnavailable = state.selectedProviderId == "android_system" && !state.androidTtsReady
     val canRunTts = state.status != HomeStatus.Loading &&
-        state.status != HomeStatus.Saving &&
-        !androidTtsUnavailable
+            state.status != HomeStatus.Saving &&
+            !androidTtsUnavailable
 
     Column(
         modifier = modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
             .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        Text(
-            text = "PhraseVoice",
-            style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold),
-        )
+        // App Title Section
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column {
+                Text(
+                    text = "PhraseVoice",
+                    style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.ExtraBold),
+                    color = MaterialTheme.colorScheme.onBackground
+                )
+                Text(
+                    text = "一键设置，开箱即用的语音合成器",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                )
+            }
+        }
 
+        // Engine Configuration Card
         Card(
             colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.25f)
+                containerColor = MaterialTheme.colorScheme.surface
             ),
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
             shape = RoundedCornerShape(24.dp),
             modifier = Modifier.fillMaxWidth()
         ) {
             Column(
                 modifier = Modifier.padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+                verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
                 Text(
                     text = "声音引擎配置",
@@ -133,98 +201,190 @@ fun HomeScreen(
             }
         }
 
+        // Text input textfield
         OutlinedTextField(
             value = state.text,
             onValueChange = onTextChange,
             label = { Text("朗读文本") },
-            minLines = 5,
+            placeholder = { Text("请输入要朗读的文本...", color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)) },
+            minLines = 4,
+            maxLines = 8,
+            shape = RoundedCornerShape(20.dp),
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedBorderColor = MaterialTheme.colorScheme.primary,
+                unfocusedBorderColor = MaterialTheme.colorScheme.outline,
+                focusedContainerColor = MaterialTheme.colorScheme.surface,
+                unfocusedContainerColor = MaterialTheme.colorScheme.surface,
+            ),
             modifier = Modifier.fillMaxWidth(),
         )
 
-        SliderRow(
-            label = "语速",
-            value = state.speed,
-            range = 0.5f..2.0f,
-            startIcon = Icons.Outlined.DirectionsWalk,
-            endIcon = Icons.Outlined.DirectionsRun,
-            onChange = onSpeedChange
-        )
-        SliderRow(
-            label = "音调",
-            value = state.pitch,
-            range = 0.5f..2.0f,
-            startIcon = Icons.Outlined.ArrowDownward,
-            endIcon = Icons.Outlined.ArrowUpward,
-            onChange = onPitchChange
-        )
-        SliderRow(
-            label = "音量",
-            value = state.volume,
-            range = 0.0f..1.0f,
-            startIcon = Icons.AutoMirrored.Outlined.VolumeMute,
-            endIcon = Icons.AutoMirrored.Outlined.VolumeUp,
-            onChange = onVolumeChange
-        )
+        // Parameters Card
+        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            SliderRow(
+                label = "语速",
+                value = state.speed,
+                range = 0.5f..2.0f,
+                startIcon = Icons.Outlined.DirectionsWalk,
+                endIcon = Icons.Outlined.DirectionsRun,
+                onChange = onSpeedChange
+            )
+            SliderRow(
+                label = "音调",
+                value = state.pitch,
+                range = 0.5f..2.0f,
+                startIcon = Icons.Outlined.ArrowDownward,
+                endIcon = Icons.Outlined.ArrowUpward,
+                onChange = onPitchChange
+            )
+            SliderRow(
+                label = "音量",
+                value = state.volume,
+                range = 0.0f..1.0f,
+                startIcon = Icons.AutoMirrored.Outlined.VolumeMute,
+                endIcon = Icons.AutoMirrored.Outlined.VolumeUp,
+                onChange = onVolumeChange
+            )
+        }
 
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Button(
-                onClick = onSpeak,
-                enabled = canRunTts,
-                modifier = Modifier.fillMaxWidth(),
+        // Control Actions Card
+        Card(
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+            shape = RoundedCornerShape(24.dp),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(
+                modifier = Modifier.padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                Icon(Icons.Outlined.PlayArrow, contentDescription = null)
-                Text(if (state.status == HomeStatus.Loading) "准备中" else "朗读")
-            }
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedButton(
-                    onClick = onStop,
-                    modifier = Modifier.weight(1f),
-                ) {
-                    Icon(Icons.Outlined.Stop, contentDescription = null)
-                    Text("停止")
-                }
-                OutlinedButton(
-                    onClick = onSaveAudio,
-                    enabled = canRunTts,
-                    modifier = Modifier.weight(1f),
-                ) {
-                    Icon(Icons.Outlined.Download, contentDescription = null)
-                    Text(if (state.status == HomeStatus.Saving) "保存中" else "保存")
-                }
-            }
-            if (!state.lastAudioUri.isNullOrBlank()) {
-                OutlinedButton(
-                    onClick = {
-                        shareAudio(
-                            context = context,
-                            uriString = state.lastAudioUri,
-                            mimeType = state.lastAudioMimeType,
-                        )
-                    },
+                Row(
                     modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Icon(Icons.Outlined.Share, contentDescription = null)
-                    Text("分享音频")
+                    Button(
+                        onClick = onSpeak,
+                        enabled = canRunTts,
+                        shape = RoundedCornerShape(16.dp),
+                        modifier = Modifier.weight(1.5f).height(52.dp),
+                        colors = androidx.compose.material3.ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.primary,
+                            contentColor = MaterialTheme.colorScheme.onPrimary
+                        )
+                    ) {
+                        if (state.status == HomeStatus.Playing) {
+                            VoiceWaveIndicator(color = MaterialTheme.colorScheme.onPrimary, modifier = Modifier.padding(end = 8.dp))
+                        } else {
+                            Icon(Icons.Outlined.PlayArrow, contentDescription = null, modifier = Modifier.padding(end = 8.dp))
+                        }
+                        Text(
+                            text = when (state.status) {
+                                HomeStatus.Loading -> "准备中..."
+                                HomeStatus.Playing -> "播放中"
+                                else -> "开始朗读"
+                            },
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                    
+                    if (state.status == HomeStatus.Playing) {
+                        Button(
+                            onClick = onStop,
+                            shape = RoundedCornerShape(16.dp),
+                            modifier = Modifier.weight(1f).height(52.dp),
+                            colors = androidx.compose.material3.ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.errorContainer,
+                                contentColor = MaterialTheme.colorScheme.onErrorContainer
+                            )
+                        ) {
+                            Icon(Icons.Outlined.Stop, contentDescription = null, modifier = Modifier.padding(end = 4.dp))
+                            Text("停止", fontWeight = FontWeight.Bold)
+                        }
+                    } else {
+                        OutlinedButton(
+                            onClick = onSaveAudio,
+                            enabled = canRunTts,
+                            shape = RoundedCornerShape(16.dp),
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                            modifier = Modifier.weight(1f).height(52.dp)
+                        ) {
+                            Icon(Icons.Outlined.Download, contentDescription = null, modifier = Modifier.padding(end = 4.dp))
+                            Text(if (state.status == HomeStatus.Saving) "保存中" else "保存", fontWeight = FontWeight.SemiBold)
+                        }
+                    }
+                }
+
+                if (!state.lastAudioUri.isNullOrBlank()) {
+                    OutlinedButton(
+                        onClick = {
+                            shareAudio(
+                                context = context,
+                                uriString = state.lastAudioUri,
+                                mimeType = state.lastAudioMimeType,
+                            )
+                        },
+                        shape = RoundedCornerShape(16.dp),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                        modifier = Modifier.fillMaxWidth().height(48.dp)
+                    ) {
+                        Icon(Icons.Outlined.Share, contentDescription = null, modifier = Modifier.padding(end = 8.dp))
+                        Text("分享生成的音频", fontWeight = FontWeight.SemiBold)
+                    }
                 }
             }
         }
 
-        StatusPanel(state = state)
+        // Status Error Alerts
+        if (state.status == HomeStatus.Error || !state.errorMessage.isNullOrBlank() || androidTtsUnavailable) {
+            Card(
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.3f)),
+                shape = RoundedCornerShape(16.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(12.dp)) {
+                    Text(
+                        text = if (androidTtsUnavailable) "系统 TTS 未就绪，请在系统设置中启用或更换 Provider" else state.errorMessage ?: "发生未知错误",
+                        color = MaterialTheme.colorScheme.onErrorContainer,
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                }
+            }
+        }
 
-        Text(text = "常用语", style = MaterialTheme.typography.titleMedium)
-        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            items(state.quickPhrases, key = { it.id }) { phrase ->
-                FilterChip(
-                    selected = phrase.isFavorite,
-                    onClick = { onQuickPhraseClick(phrase) },
-                    label = {
-                        Text(
-                            text = phrase.title,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    },
+        // Quick Phrases Section
+        if (state.quickPhrases.isNotEmpty()) {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(
+                    text = "常用语快捷朗读",
+                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.8f)
                 )
+                LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    items(state.quickPhrases, key = { it.id }) { phrase ->
+                        SuggestionChip(
+                            onClick = { onQuickPhraseClick(phrase) },
+                            label = {
+                                Text(
+                                    text = phrase.title,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    fontWeight = FontWeight.Medium
+                                )
+                            },
+                            shape = RoundedCornerShape(12.dp),
+                            border = SuggestionChipDefaults.suggestionChipBorder(
+                                borderColor = MaterialTheme.colorScheme.outline
+                            ),
+                            colors = SuggestionChipDefaults.suggestionChipColors(
+                                containerColor = MaterialTheme.colorScheme.surface
+                            )
+                        )
+                    }
+                }
             }
         }
     }
@@ -252,6 +412,13 @@ private fun ProviderDropdown(
             onValueChange = {},
             label = { Text("Provider") },
             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+            shape = RoundedCornerShape(16.dp),
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedBorderColor = MaterialTheme.colorScheme.primary,
+                unfocusedBorderColor = MaterialTheme.colorScheme.outline,
+                focusedContainerColor = MaterialTheme.colorScheme.surface,
+                unfocusedContainerColor = MaterialTheme.colorScheme.surface,
+            )
         )
         ExposedDropdownMenu(
             expanded = expanded,
@@ -297,6 +464,13 @@ private fun VoiceStyleDropdown(
             onValueChange = {},
             label = { Text("风格") },
             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+            shape = RoundedCornerShape(16.dp),
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedBorderColor = MaterialTheme.colorScheme.primary,
+                unfocusedBorderColor = MaterialTheme.colorScheme.outline,
+                focusedContainerColor = MaterialTheme.colorScheme.surface,
+                unfocusedContainerColor = MaterialTheme.colorScheme.surface,
+            )
         )
         ExposedDropdownMenu(
             expanded = expanded,
@@ -337,6 +511,13 @@ private fun VoiceDropdown(
             onValueChange = {},
             label = { Text("Voice") },
             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+            shape = RoundedCornerShape(16.dp),
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedBorderColor = MaterialTheme.colorScheme.primary,
+                unfocusedBorderColor = MaterialTheme.colorScheme.outline,
+                focusedContainerColor = MaterialTheme.colorScheme.surface,
+                unfocusedContainerColor = MaterialTheme.colorScheme.surface,
+            )
         )
         ExposedDropdownMenu(
             expanded = expanded,
@@ -375,12 +556,13 @@ private fun SliderRow(
 ) {
     Card(
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)
+            containerColor = MaterialTheme.colorScheme.surface
         ),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
         shape = RoundedCornerShape(20.dp),
         modifier = Modifier.fillMaxWidth()
     ) {
-        Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp)) {
+        Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     text = label,
@@ -395,7 +577,7 @@ private fun SliderRow(
                 )
             }
 
-            Spacer(modifier = Modifier.height(6.dp))
+            Spacer(modifier = Modifier.height(4.dp))
 
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(
@@ -434,7 +616,7 @@ private fun SliderRow(
                     track = { sliderState ->
                         val fraction = (sliderState.value - sliderState.valueRange.start) /
                                 (sliderState.valueRange.endInclusive - sliderState.valueRange.start)
-                        androidx.compose.foundation.Canvas(
+                        Canvas(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(8.dp)
@@ -452,7 +634,7 @@ private fun SliderRow(
                                 cornerRadius = cornerRadius
                             )
 
-                            // Active track with linear gradient!
+                            // Active track with linear gradient
                             drawRoundRect(
                                 brush = androidx.compose.ui.graphics.Brush.linearGradient(
                                     colors = listOf(primaryColor, tertiaryColor)
@@ -475,46 +657,6 @@ private fun SliderRow(
         }
     }
 }
-
-@Composable
-private fun StatusPanel(state: HomeUiState) {
-    Card(
-        colors = CardDefaults.cardColors(
-            containerColor = when (state.status) {
-                HomeStatus.Error -> MaterialTheme.colorScheme.errorContainer
-                HomeStatus.Playing -> MaterialTheme.colorScheme.primaryContainer
-                else -> MaterialTheme.colorScheme.surfaceVariant
-            },
-        ),
-    ) {
-        Column(modifier = Modifier.padding(12.dp)) {
-            AssistChip(
-                onClick = {},
-                label = { Text(statusLabel(state.status)) },
-            )
-            if (!state.errorMessage.isNullOrBlank()) {
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(text = state.errorMessage, color = MaterialTheme.colorScheme.error)
-            }
-            if (!state.lastAudioUri.isNullOrBlank()) {
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    text = "音频已生成，可分享",
-                    style = MaterialTheme.typography.bodyMedium,
-                )
-            }
-        }
-    }
-}
-
-private fun statusLabel(status: HomeStatus): String =
-    when (status) {
-        HomeStatus.Idle -> "空闲"
-        HomeStatus.Loading -> "准备中"
-        HomeStatus.Playing -> "播放中"
-        HomeStatus.Saving -> "保存中"
-        HomeStatus.Error -> "出错"
-    }
 
 private fun shareAudio(
     context: Context,

@@ -12,9 +12,7 @@ class MainActivity : ComponentActivity() {
 
         val appContainer = (application as PhraseVoiceApp).container
         setContent {
-            PhraseVoiceTheme {
-                PhraseVoiceRoot(container = appContainer)
-            }
+            PhraseVoiceRoot(container = appContainer)
         }
     }
 }

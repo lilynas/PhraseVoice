@@ -11,25 +11,35 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 
 private val LightColors = lightColorScheme(
-    primary = Color(0xFF0F766E),
+    primary = Color(0xFF2C5E43), // Forest Sage green
     onPrimary = Color.White,
-    primaryContainer = Color(0xFFCCFBF1),
-    onPrimaryContainer = Color(0xFF042F2E),
-    secondary = Color(0xFF7C3AED),
-    tertiary = Color(0xFFB45309),
-    background = Color(0xFFF8FAFC),
+    primaryContainer = Color(0xFFD2E8DD),
+    onPrimaryContainer = Color(0xFF0A2B18),
+    secondary = Color(0xFF6F5E4B), // Warm earth brown
+    tertiary = Color(0xFF8B6C5C),
+    background = Color(0xFFFAF8F5), // Warm Milk-white
     surface = Color(0xFFFFFFFF),
+    onBackground = Color(0xFF262624),
+    onSurface = Color(0xFF262624),
+    surfaceVariant = Color(0xFFFAF8F5), // Same warm background
+    onSurfaceVariant = Color(0xFF4C4B45),
+    outline = Color(0xFFE5E2DA), // Warm light gray for border
 )
 
 private val DarkColors = darkColorScheme(
-    primary = Color(0xFF5EEAD4),
-    onPrimary = Color(0xFF042F2E),
-    primaryContainer = Color(0xFF115E59),
-    onPrimaryContainer = Color(0xFFCCFBF1),
-    secondary = Color(0xFFC4B5FD),
-    tertiary = Color(0xFFFCD34D),
-    background = Color(0xFF0F172A),
-    surface = Color(0xFF111827),
+    primary = Color(0xFF10B981), // Neon Cyan/Teal
+    onPrimary = Color.Black,
+    primaryContainer = Color(0xFF064E3B),
+    onPrimaryContainer = Color(0xFFD1FAE5),
+    secondary = Color(0xFF34D399),
+    tertiary = Color(0xFF60A5FA),
+    background = Color(0xFF000000), // OLED Pure Black
+    surface = Color(0xFF0C0C0C), // Very dark gray for obsidian look
+    onBackground = Color(0xFFF3F4F6),
+    onSurface = Color(0xFFF3F4F6),
+    surfaceVariant = Color(0xFF0C0C0C),
+    onSurfaceVariant = Color(0xFF94A3B8),
+    outline = Color(0xFF1E293B), // Sleek border color for OLED black
 )
 
 private val ExpressiveShapes = Shapes(
