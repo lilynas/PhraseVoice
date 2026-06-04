@@ -17,6 +17,8 @@ local.properties
 
 # 构建产物
 artifacts/
+build_output/
+build_output.*/
 *.apk
 *.aab
 *.ap_

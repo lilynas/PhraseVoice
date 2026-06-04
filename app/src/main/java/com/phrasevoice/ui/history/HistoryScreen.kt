@@ -37,6 +37,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.phrasevoice.data.model.TtsHistory
+import com.phrasevoice.ui.i18n.AppLanguage
+import com.phrasevoice.ui.i18n.LocalAppLanguage
+import com.phrasevoice.ui.i18n.t
+import com.phrasevoice.ui.i18n.translate
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -53,6 +57,7 @@ fun HistoryScreen(
             formatter.format(java.util.Date(item.createdAt))
         }
     }
+    val language = LocalAppLanguage.current
 
     Column(
         modifier = modifier
@@ -68,7 +73,7 @@ fun HistoryScreen(
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = "历史记录",
+                    text = t("历史记录", "History"),
                     style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.ExtraBold),
                     color = MaterialTheme.colorScheme.onBackground
                 )
@@ -82,7 +87,7 @@ fun HistoryScreen(
                     )
                 ) {
                     Icon(Icons.Outlined.DeleteSweep, contentDescription = null, modifier = Modifier.padding(end = 4.dp))
-                    Text("清空", fontWeight = FontWeight.Bold)
+                    Text(t("清空", "Clear"), fontWeight = FontWeight.Bold)
                 }
             }
         }
@@ -99,13 +104,13 @@ fun HistoryScreen(
                     verticalArrangement = Arrangement.Center
                 ) {
                     Text(
-                        text = "暂无历史记录",
+                        text = t("暂无历史记录", "No History Yet"),
                         style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        text = "开始在朗读页面输入并播放吧！",
+                        text = t("开始在朗读页面输入并播放吧！", "Enter text on the Read page and play it."),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
                     )
@@ -125,7 +130,7 @@ fun HistoryScreen(
                                 .padding(vertical = 6.dp)
                         ) {
                             Text(
-                                text = getFriendlyDateLabel(date),
+                                text = getFriendlyDateLabel(date, language),
                                 style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                                 color = MaterialTheme.colorScheme.primary
                             )
@@ -165,7 +170,7 @@ private fun HistoryRow(
         ) {
             Icon(
                 imageVector = Icons.Outlined.PlayArrow,
-                contentDescription = "重播",
+                contentDescription = t("重播", "Replay"),
                 tint = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.size(24.dp)
             )
@@ -191,7 +196,7 @@ private fun HistoryRow(
             IconButton(onClick = onSaveAsPhrase) {
                 Icon(
                     imageVector = Icons.Outlined.BookmarkAdd,
-                    contentDescription = "转常用语",
+                    contentDescription = t("转常用语", "Save as Phrase"),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
                 )
             }
@@ -199,13 +204,13 @@ private fun HistoryRow(
     }
 }
 
-private fun getFriendlyDateLabel(dateStr: String): String {
+private fun getFriendlyDateLabel(dateStr: String, language: AppLanguage): String {
     val formatter = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault())
     val today = formatter.format(java.util.Date())
     val yesterday = formatter.format(java.util.Date(System.currentTimeMillis() - 24 * 60 * 60 * 1000))
     return when (dateStr) {
-        today -> "今天"
-        yesterday -> "昨天"
+        today -> translate(language, "今天", "Today")
+        yesterday -> translate(language, "昨天", "Yesterday")
         else -> dateStr
     }
 }

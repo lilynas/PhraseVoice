@@ -11,7 +11,10 @@ import com.phrasevoice.data.model.Phrase
 import com.phrasevoice.data.repository.HistoryRepository
 import com.phrasevoice.data.repository.PhraseRepository
 import com.phrasevoice.data.repository.ProviderConfigRepository
+import com.phrasevoice.data.repository.ProviderHealthStatus
 import com.phrasevoice.data.repository.SettingsRepository
+import com.phrasevoice.data.repository.isReady
+import com.phrasevoice.data.repository.providerHealthForConfig
 import com.phrasevoice.data.tts.AudioPlaybackController
 import com.phrasevoice.data.tts.AndroidSystemTtsProvider
 import com.phrasevoice.data.tts.CloudTtsService
@@ -44,6 +47,7 @@ data class TtsProviderOption(
     val id: String,
     val name: String,
     val enabled: Boolean = true,
+    val status: ProviderHealthStatus = ProviderHealthStatus.Ready,
     val note: String? = null,
 )
 
@@ -201,13 +205,13 @@ class HomeViewModel(
                 lastAudioMimeType = null,
                 status = when {
                     androidUnavailable -> HomeStatus.Error
-                    option.enabled -> HomeStatus.Idle
+                    option.status.isReady -> HomeStatus.Idle
                     else -> HomeStatus.Error
                 },
                 errorMessage = when {
                     androidUnavailable -> it.androidTtsMessage
-                    option.enabled -> null
-                    else -> "${option.name} 尚未启用，请先在 Provider 页面保存配置。"
+                    option.status.isReady -> null
+                    else -> providerHealthErrorMessage(option.name, option.status)
                 },
             )
         }
@@ -455,10 +459,29 @@ class HomeViewModel(
     private fun ProviderConfig.toProviderOption(
         androidTtsReady: Boolean = true,
         androidTtsMessage: String? = null,
-    ): TtsProviderOption =
-        TtsProviderOption(
+    ): TtsProviderOption {
+        val status = providerHealthForConfig(
+            config = this,
+            androidTtsReady = androidTtsReady,
+        )
+        return TtsProviderOption(
             id = providerId,
-            name = when (providerId) {
+            name = providerLabel(providerId),
+            enabled = status.isReady,
+            status = status,
+            note = when (status) {
+                ProviderHealthStatus.Ready -> null
+                ProviderHealthStatus.Disabled -> "未配置"
+                ProviderHealthStatus.MissingApiKey -> "缺少 API Key"
+                ProviderHealthStatus.MissingBaseUrl -> "缺少 Base URL"
+                ProviderHealthStatus.SystemUnavailable ->
+                    androidTtsMessage ?: "系统 TTS 不可用"
+            },
+        )
+    }
+
+    private fun providerLabel(providerId: String): String =
+        when (providerId) {
                 ProviderConfigRepository.ANDROID_SYSTEM -> "Android System TTS"
                 ProviderConfigRepository.OPENAI -> "OpenAI TTS"
                 ProviderConfigRepository.EDGE_TTS_FORWARDER -> "Edge TTS Forwarder"
@@ -466,19 +489,19 @@ class HomeViewModel(
                 ProviderConfigRepository.MIMO -> "MiMo TTS"
                 ProviderConfigRepository.CUSTOM_HTTP -> "Custom TTS API"
                 else -> providerId
-            },
-            enabled = if (providerId == ProviderConfigRepository.ANDROID_SYSTEM) {
-                enabled && androidTtsReady
-            } else {
-                enabled
-            },
-            note = when {
-                providerId == ProviderConfigRepository.ANDROID_SYSTEM && !androidTtsReady ->
-                    androidTtsMessage ?: "系统 TTS 不可用"
-                !enabled -> "未启用"
-                else -> null
-            },
-        )
+        }
+
+    private fun providerHealthErrorMessage(
+        providerName: String,
+        status: ProviderHealthStatus,
+    ): String =
+        when (status) {
+            ProviderHealthStatus.Ready -> ""
+            ProviderHealthStatus.Disabled -> "$providerName 未配置，请先在 Provider 页面启用并保存。"
+            ProviderHealthStatus.MissingApiKey -> "$providerName 缺少 API Key，请先在 Provider 页面保存 API Key。"
+            ProviderHealthStatus.MissingBaseUrl -> "$providerName 缺少 Base URL，请先在 Provider 页面填写服务地址。"
+            ProviderHealthStatus.SystemUnavailable -> "Android 系统 TTS 暂不可用。"
+        }
 
     private fun voicesFor(providerId: String): List<TtsVoice> =
         when (providerId) {

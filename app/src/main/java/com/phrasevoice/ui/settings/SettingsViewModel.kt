@@ -9,12 +9,16 @@ import com.phrasevoice.debug.AppLogger
 import com.phrasevoice.debug.DebugLogEntry
 import com.phrasevoice.data.model.UserSettings
 import com.phrasevoice.data.repository.ProviderConfigRepository
+import com.phrasevoice.data.repository.ProviderHealthStatus
 import com.phrasevoice.data.repository.SettingsRepository
+import com.phrasevoice.data.repository.isReady
+import com.phrasevoice.data.repository.providerHealthForConfig
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -23,6 +27,7 @@ data class SettingsProviderOption(
     val id: String,
     val name: String,
     val enabled: Boolean,
+    val status: ProviderHealthStatus = ProviderHealthStatus.Ready,
     val note: String? = null,
 )
 
@@ -32,6 +37,7 @@ data class SettingsUiState(
     val audioCacheInfo: AudioCacheInfo = AudioCacheInfo(fileCount = 0, totalBytes = 0),
     val cacheMessage: String? = null,
     val debugLogs: List<DebugLogEntry> = emptyList(),
+    val isLoaded: Boolean = false,
 )
 
 class SettingsViewModel(
@@ -41,6 +47,17 @@ class SettingsViewModel(
 ) : ViewModel() {
     private val audioCacheInfo = MutableStateFlow(audioFileStore.cacheInfo())
     private val cacheMessage = MutableStateFlow<String?>(null)
+
+    init {
+        viewModelScope.launch {
+            settingsRepository.settings.collect { settings ->
+                AppLogger.configure(
+                    enabled = settings.debugLoggingEnabled,
+                    minLevel = settings.debugLogLevel,
+                )
+            }
+        }
+    }
 
     val uiState: StateFlow<SettingsUiState> = combine(
         settingsRepository.settings,
@@ -55,6 +72,7 @@ class SettingsViewModel(
             audioCacheInfo = cacheInfo,
             cacheMessage = message,
             debugLogs = logs,
+            isLoaded = true,
         )
     }
         .stateIn(
@@ -89,6 +107,22 @@ class SettingsViewModel(
 
     fun updateThemeMode(value: String) {
         update { it.copy(themeMode = value) }
+    }
+
+    fun updateLanguageMode(value: String) {
+        update { it.copy(languageMode = value) }
+    }
+
+    fun completeOnboarding() {
+        update { it.copy(hasCompletedOnboarding = true) }
+    }
+
+    fun updateDebugLoggingEnabled(value: Boolean) {
+        update { it.copy(debugLoggingEnabled = value) }
+    }
+
+    fun updateDebugLogLevel(value: String) {
+        update { it.copy(debugLogLevel = value) }
     }
 
     fun clearDebugLogs() {
@@ -128,8 +162,9 @@ class SettingsViewModel(
         }
     }
 
-    private fun toProviderOption(config: ProviderConfig): SettingsProviderOption =
-        SettingsProviderOption(
+    private fun toProviderOption(config: ProviderConfig): SettingsProviderOption {
+        val status = providerHealthForConfig(config)
+        return SettingsProviderOption(
             id = config.providerId,
             name = when (config.providerId) {
                 ProviderConfigRepository.ANDROID_SYSTEM -> "Android System TTS"
@@ -140,12 +175,17 @@ class SettingsViewModel(
                 ProviderConfigRepository.CUSTOM_HTTP -> "Custom TTS API"
                 else -> config.providerId
             },
-            enabled = config.enabled,
-            note = when {
-                !config.enabled -> "未启用"
-                else -> null
+            enabled = status.isReady,
+            status = status,
+            note = when (status) {
+                ProviderHealthStatus.Ready -> null
+                ProviderHealthStatus.Disabled -> "未配置"
+                ProviderHealthStatus.MissingApiKey -> "缺少 API Key"
+                ProviderHealthStatus.MissingBaseUrl -> "缺少 Base URL"
+                ProviderHealthStatus.SystemUnavailable -> "系统 TTS 不可用"
             },
         )
+    }
 
     companion object {
         private const val TAG = "SettingsViewModel"

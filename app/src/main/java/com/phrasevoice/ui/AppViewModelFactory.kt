@@ -45,6 +45,7 @@ class AppViewModelFactory(
                 providerConfigRepository = container.providerConfigRepository,
                 cloudTtsService = container.cloudTtsService,
                 audioPlaybackController = container.audioPlaybackController,
+                systemTtsProvider = container.systemTtsProvider,
             )
 
             else -> error("Unknown ViewModel class: ${modelClass.name}")

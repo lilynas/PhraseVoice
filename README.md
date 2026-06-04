@@ -1,44 +1,53 @@
 # PhraseVoice
 
-PhraseVoice is an open-source Android text-to-speech app for quickly typing or choosing common phrases and reading them aloud.
+[![Android CI](https://github.com/lilynas/PhraseVoice/actions/workflows/android.yml/badge.svg)](https://github.com/lilynas/PhraseVoice/actions/workflows/android.yml)
+![Kotlin](https://img.shields.io/badge/Kotlin-7F52FF?logo=kotlin&logoColor=white)
+![Android](https://img.shields.io/badge/Android-3DDC84?logo=android&logoColor=white)
+![Jetpack Compose](https://img.shields.io/badge/Jetpack%20Compose-4285F4?logo=jetpackcompose&logoColor=white)
 
-## Current Scope
+**语言**：简体中文 | [English](README.en.md)
 
-Phase 1 MVP is in progress:
+PhraseVoice 是一个简洁的 Android 文本转语音工具，适合快速输入文本、管理常用语，并通过不同语音服务生成朗读音频。
 
-- Android + Kotlin + Jetpack Compose + Material 3
-- Local Android `TextToSpeech` provider
-- Phrase library with add, edit, delete, favorite, search, and quick speak
-- Phrase JSON import/export with merge import and duplicate skipping
-- History records with replay and save-as-phrase
-- Audio export through Android system TTS as WAV
-- Provider abstraction ready for cloud providers
-- Edge TTS Forwarder provider for user-managed `ms-ra-forwarder` instances, with voice and style dropdowns
-- Gemini TTS provider through Google `generateContent`, with preset voice dropdowns and WAV output wrapping
-- Xiaomi MiMo V2.5 TTS provider with preset voices, VoiceDesign character voice presets, description optimization, optional preview text optimization, and optional compatible streaming synthesis
-- GitHub Actions CI for build and unit test verification
+## 截图
 
-Phase 2 will continue with broader Custom HTTP presets.
+<p>
+  <img src="docs/screenshots/home.png" width="220" alt="朗读首页" />
+  <img src="docs/screenshots/provider.png" width="220" alt="Provider 配置" />
+  <img src="docs/screenshots/settings.png" width="220" alt="设置页" />
+</p>
 
-## Build Verification
+## 功能
 
-This workspace does not assume a local Android toolchain. CI is the source of truth for compilation:
+- 文本朗读、停止、保存与分享音频
+- 常用语管理：新增、编辑、收藏、搜索、导入和导出 JSON
+- 历史记录：重播、保存为常用语
+- 多 Provider：Android System TTS、OpenAI TTS、Edge TTS Forwarder、Gemini TTS、MiMo TTS、Custom HTTP
+- MiMo VoiceDesign 角色声音、提示词优化与流式合成
+- 首次配置引导与 Provider 可用状态提示
+- 深色/浅色主题、应用内语言切换、调试日志开关
+
+## 技术栈
+
+- Kotlin
+- Jetpack Compose + Material 3
+- Android DataStore
+- Kotlin Coroutines
+- OkHttp
+- Media3 ExoPlayer
+- GitHub Actions CI
+
+## 下载
+
+请在 [Releases](https://github.com/lilynas/PhraseVoice/releases) 下载最新 APK。
+
+## 构建
+
+项目通过 GitHub Actions 编译。CI 使用 JDK 17、Android SDK 35 和 Gradle 8.7 执行：
 
 ```bash
-gradle :app:assembleDebug :app:testDebugUnitTest --stacktrace
+gradle :app:assembleDebug :app:assembleDebugAndroidTest :app:testDebugUnitTest --stacktrace
 ```
-
-The workflow installs JDK 17, Android SDK 35, and Gradle 8.7.
-
-## Provider And API Key Safety
-
-- Do not commit API keys, tokens, `.env` files, keystores, or provider secrets.
-- Network request logging must stay disabled or redacted before cloud providers are enabled.
-- Users are responsible for third-party API costs.
-- Gemini TTS uses the Google AI `generateContent` speech endpoint and stores the API key only through the app's provider configuration.
-- MiMo TTS will follow Xiaomi MiMo's official V2.5 speech synthesis API and store API keys only through the app's provider configuration.
-- MiMo VoiceDesign stores user-authored or user-approved voice descriptions locally. Description optimization uses the saved or temporarily entered MiMo API key, but does not store raw debug payloads.
-- Edge TTS Forwarder is intended for user-managed `ms-ra-forwarder` deployments. If the deployment requires `TOKEN`, save it in the provider's Token field. Non-official services may have stability and compliance risks.
 
 ## License
 
