@@ -5,6 +5,8 @@
 ![Android](https://img.shields.io/badge/Android-3DDC84?logo=android&logoColor=white)
 ![Jetpack Compose](https://img.shields.io/badge/Jetpack%20Compose-4285F4?logo=jetpackcompose&logoColor=white)
 
+**语言**：简体中文 | [English](README.en.md)
+
 PhraseVoice 是一个简洁的 Android 文本转语音工具，适合快速输入文本、管理常用语，并通过不同语音服务生成朗读音频。
 
 ## 截图
