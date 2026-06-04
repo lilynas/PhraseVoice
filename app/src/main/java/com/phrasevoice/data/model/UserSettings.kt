@@ -12,6 +12,6 @@ data class UserSettings(
     val keepAudioCache: Boolean = true,
     val themeMode: String = "system",
     val languageMode: String = "system",
-    val debugLoggingEnabled: Boolean = true,
+    val debugLoggingEnabled: Boolean = false,
     val debugLogLevel: String = "INFO",
 )
