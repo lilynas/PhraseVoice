@@ -73,6 +73,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.phrasevoice.data.model.Phrase
+import com.phrasevoice.ui.i18n.localizedEdgeStyleName
+import com.phrasevoice.ui.i18n.localizedHomeErrorMessage
+import com.phrasevoice.ui.i18n.localizedPhraseTitle
 import com.phrasevoice.ui.i18n.t
 
 @Composable
@@ -283,7 +286,8 @@ fun HomeScreen(
                                 "System TTS is not ready. Enable it in system settings or switch Provider.",
                             )
                         } else {
-                            state.errorMessage ?: t("发生未知错误", "Unknown error")
+                            state.errorMessage?.let { localizedHomeErrorMessage(it) }
+                                ?: t("发生未知错误", "Unknown error")
                         },
                         color = MaterialTheme.colorScheme.onErrorContainer,
                         style = MaterialTheme.typography.bodyMedium
@@ -309,7 +313,7 @@ fun HomeScreen(
                             onClick = { onQuickPhraseClick(phrase) },
                             label = {
                                 Text(
-                                    text = phrase.title,
+                                    text = localizedPhraseTitle(phrase),
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis,
                                     fontWeight = FontWeight.Medium
@@ -429,7 +433,7 @@ private fun ProviderDropdown(
                 .menuAnchor()
                 .fillMaxWidth(),
             readOnly = true,
-            value = selected?.name.orEmpty(),
+            value = selected?.let { localizedEdgeStyleName(it) }.orEmpty(),
             onValueChange = {},
             label = { Text("Provider") },
             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
@@ -500,7 +504,7 @@ private fun VoiceStyleDropdown(
         ) {
             state.voiceStyles.forEach { style ->
                 DropdownMenuItem(
-                    text = { Text(style.name) },
+                    text = { Text(localizedEdgeStyleName(style)) },
                     onClick = {
                         expanded = false
                         onVoiceStyleSelected(style.id)

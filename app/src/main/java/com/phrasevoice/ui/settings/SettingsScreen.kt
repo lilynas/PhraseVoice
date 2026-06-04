@@ -70,6 +70,7 @@ import androidx.compose.ui.unit.dp
 import com.phrasevoice.BuildConfig
 import com.phrasevoice.debug.DebugLogEntry
 import com.phrasevoice.ui.i18n.AppLanguageMode
+import com.phrasevoice.ui.i18n.localizedSettingsStatusMessage
 import com.phrasevoice.ui.i18n.t
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -540,7 +541,7 @@ private fun AudioCacheCard(
             style = MaterialTheme.typography.bodyMedium,
         )
         state.cacheMessage?.takeIf { it.isNotBlank() }?.let { message ->
-            Text(text = message, style = MaterialTheme.typography.bodySmall)
+            Text(text = localizedSettingsStatusMessage(message), style = MaterialTheme.typography.bodySmall)
         }
     }
 }

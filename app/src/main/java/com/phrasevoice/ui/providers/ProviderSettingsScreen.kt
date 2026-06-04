@@ -2,6 +2,8 @@ package com.phrasevoice.ui.providers
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -57,6 +59,7 @@ import com.phrasevoice.data.repository.ProviderConfigRepository
 import com.phrasevoice.data.tts.EdgeForwarderCatalog
 import com.phrasevoice.data.tts.GeminiTtsCatalog
 import com.phrasevoice.data.tts.MimoTtsCatalog
+import com.phrasevoice.ui.i18n.localizedProviderStatusMessage
 import com.phrasevoice.ui.i18n.t
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -271,10 +274,13 @@ fun ProviderSettingsScreen(
                         }
 
                         state.savedMessage?.let { msg ->
-                            val isError = msg.contains("失败") || msg.contains("错误")
+                            val localizedMessage = localizedProviderStatusMessage(msg)
+                            val isError = msg.contains("失败") || msg.contains("错误") ||
+                                localizedMessage.contains("failed", ignoreCase = true) ||
+                                localizedMessage.contains("error", ignoreCase = true)
                             val color = if (isError) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
                             Text(
-                                text = msg,
+                                text = localizedMessage,
                                 color = color,
                                 style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
                                 modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 4.dp)
@@ -772,7 +778,7 @@ private fun MimoVoiceDropdown(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 private fun CustomHttpFields(
     state: ProviderSettingsUiState,
@@ -793,21 +799,22 @@ private fun CustomHttpFields(
             style = MaterialTheme.typography.titleMedium,
             color = MaterialTheme.colorScheme.primary,
         )
-        Row(
+        FlowRow(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
             modifier = Modifier.fillMaxWidth()
         ) {
             AssistChip(
                 onClick = { onApplyTemplate("OpenAI") },
-                label = { Text(t("OpenAI / 兼容", "OpenAI / Compatible")) }
+                label = { Text(t("OpenAI / 兼容", "OpenAI / Compatible"), maxLines = 1) }
             )
             AssistChip(
                 onClick = { onApplyTemplate("MiniMax") },
-                label = { Text("MiniMax") }
+                label = { Text("MiniMax", maxLines = 1) }
             )
             AssistChip(
                 onClick = { onApplyTemplate("Volcengine") },
-                label = { Text(t("火山引擎", "Volcengine")) }
+                label = { Text(t("火山引擎", "Volcengine"), maxLines = 1) }
             )
         }
 

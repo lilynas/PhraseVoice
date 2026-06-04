@@ -64,6 +64,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.phrasevoice.data.model.Phrase
+import com.phrasevoice.ui.i18n.localizedPhraseLibraryStatusMessage
+import com.phrasevoice.ui.i18n.localizedPhraseGroupName
+import com.phrasevoice.ui.i18n.localizedPhraseTitle
 import com.phrasevoice.ui.i18n.t
 import kotlinx.coroutines.launch
 
@@ -199,7 +202,7 @@ fun PhraseLibraryScreen(
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Text(
-                    text = message,
+                    text = localizedPhraseLibraryStatusMessage(message),
                     style = MaterialTheme.typography.bodyMedium,
                     modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
                     color = MaterialTheme.colorScheme.onPrimaryContainer
@@ -258,7 +261,7 @@ fun PhraseLibraryScreen(
                 FilterChip(
                     selected = state.selectedGroupId == group.id,
                     onClick = { onGroupSelected(group.id) },
-                    label = { Text(group.name) },
+                    label = { Text(localizedPhraseGroupName(group)) },
                     shape = RoundedCornerShape(12.dp)
                 )
             }
@@ -361,7 +364,7 @@ private fun PhraseRow(
 
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = phrase.title,
+                        text = localizedPhraseTitle(phrase),
                         style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                         color = MaterialTheme.colorScheme.onSurface
                     )
