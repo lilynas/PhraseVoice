@@ -13,7 +13,6 @@ PhraseVoice 是一个简洁的 Android 文本转语音工具，适合快速输�
   <img src="docs/screenshots/home.png" width="220" alt="朗读首页" />
   <img src="docs/screenshots/provider.png" width="220" alt="Provider 配置" />
   <img src="docs/screenshots/settings.png" width="220" alt="设置页" />
-  <img src="docs/screenshots/language-menu.png" width="220" alt="语言切换" />
 </p>
 
 ## 功能
