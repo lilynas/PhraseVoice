@@ -433,7 +433,7 @@ private fun ProviderDropdown(
                 .menuAnchor()
                 .fillMaxWidth(),
             readOnly = true,
-            value = selected?.let { localizedEdgeStyleName(it) }.orEmpty(),
+            value = selected?.name.orEmpty(),
             onValueChange = {},
             label = { Text("Provider") },
             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
@@ -486,7 +486,7 @@ private fun VoiceStyleDropdown(
                 .menuAnchor()
                 .fillMaxWidth(),
             readOnly = true,
-            value = selected?.name.orEmpty(),
+            value = selected?.let { localizedEdgeStyleName(it) }.orEmpty(),
             onValueChange = {},
             label = { Text(t("风格", "Style")) },
             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
