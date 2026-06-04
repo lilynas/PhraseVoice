@@ -23,7 +23,10 @@ import com.phrasevoice.data.tts.EdgeForwarderStyle
 import com.phrasevoice.data.tts.GeminiTtsCatalog
 import com.phrasevoice.data.tts.MimoTtsCatalog
 import com.phrasevoice.debug.AppLogger
+import com.phrasevoice.domain.text.TextOptimizationAction
+import com.phrasevoice.domain.text.TextOptimizer
 import com.phrasevoice.domain.model.AudioFormat
+import com.phrasevoice.domain.tts.ReadingPreset
 import com.phrasevoice.domain.tts.TtsRequest
 import com.phrasevoice.domain.tts.TtsResult
 import com.phrasevoice.domain.tts.TtsVoice
@@ -249,8 +252,81 @@ class HomeViewModel(
         _uiState.update { it.copy(volume = value) }
     }
 
+    fun applyReadingPreset(preset: ReadingPreset) {
+        _uiState.update { state ->
+            val presetStyleId = preset.edgeStyleId
+                ?.takeIf { styleId -> state.voiceStyles.any { it.id == styleId } }
+            state.copy(
+                speed = preset.speed,
+                pitch = preset.pitch,
+                volume = preset.volume,
+                selectedVoiceStyleId = presetStyleId ?: state.selectedVoiceStyleId,
+                errorMessage = null,
+                status = HomeStatus.Idle,
+            )
+        }
+    }
+
+    fun optimizeText(action: TextOptimizationAction) {
+        _uiState.update { state ->
+            val optimized = TextOptimizer.apply(state.text, action)
+            state.copy(
+                text = optimized,
+                errorMessage = null,
+                status = HomeStatus.Idle,
+                lastAudioUri = null,
+                lastAudioMimeType = null,
+            )
+        }
+    }
+
     fun speak() {
         speakText(uiState.value.text)
+    }
+
+    fun previewVoice() {
+        viewModelScope.launch {
+            val sampleText = "你好，这是 PhraseVoice 的声音试听。Hello, this is a voice preview."
+            _uiState.update { it.copy(status = HomeStatus.Loading, errorMessage = null) }
+            val request = currentRequest(
+                text = sampleText,
+                outputFormat = outputFormatForSelectedProvider(),
+            )
+            AppLogger.i(
+                TAG,
+                "preview start provider=${request.providerId} voice=${request.voiceId.orEmpty()}",
+            )
+            when (val result = synthesizeForCurrentProvider(request, playAudioFile = true)) {
+                is TtsResult.LocalPlaybackStarted -> {
+                    _uiState.update {
+                        it.copy(
+                            status = HomeStatus.Playing,
+                            errorMessage = null,
+                            lastAudioUri = null,
+                            lastAudioMimeType = null,
+                        )
+                    }
+                }
+
+                is TtsResult.AudioFile -> {
+                    _uiState.update {
+                        it.copy(
+                            status = HomeStatus.Playing,
+                            lastAudioUri = result.uri.toString(),
+                            lastAudioMimeType = result.mimeType,
+                            errorMessage = null,
+                        )
+                    }
+                }
+
+                is TtsResult.Error -> {
+                    AppLogger.e(TAG, "preview failed provider=${request.providerId}: ${result.message}", result.cause)
+                    _uiState.update {
+                        it.copy(status = HomeStatus.Error, errorMessage = result.message)
+                    }
+                }
+            }
+        }
     }
 
     fun speakPhrase(phraseId: String, text: String) {

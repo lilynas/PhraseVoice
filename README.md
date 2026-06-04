@@ -25,6 +25,7 @@ PhraseVoice 是一个简洁的 Android 文本转语音工具，适合快速输�
 - 多 Provider：Android System TTS、OpenAI TTS、Edge TTS Forwarder、Gemini TTS、MiMo TTS、Custom HTTP
 - MiMo VoiceDesign 角色声音、提示词优化与流式合成
 - 首次配置引导与 Provider 可用状态提示
+- 朗读场景预设、文本优化工具与当前声音试听
 - 深色/浅色主题、应用内语言切换、调试日志开关
 
 ## 技术栈

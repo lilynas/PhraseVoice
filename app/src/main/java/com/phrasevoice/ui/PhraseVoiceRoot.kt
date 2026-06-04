@@ -159,7 +159,10 @@ fun PhraseVoiceRoot(container: AppContainer) {
                             onSpeedChange = homeViewModel::updateSpeed,
                             onPitchChange = homeViewModel::updatePitch,
                             onVolumeChange = homeViewModel::updateVolume,
+                            onReadingPresetSelected = homeViewModel::applyReadingPreset,
+                            onTextOptimizationSelected = homeViewModel::optimizeText,
                             onSpeak = homeViewModel::speak,
+                            onPreviewVoice = homeViewModel::previewVoice,
                             onStop = homeViewModel::stop,
                             onSaveAudio = homeViewModel::saveAudio,
                             onQuickPhraseClick = { phrase ->
