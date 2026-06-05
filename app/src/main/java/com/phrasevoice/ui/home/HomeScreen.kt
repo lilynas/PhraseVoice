@@ -15,7 +15,6 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -49,6 +48,7 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -58,6 +58,7 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.SuggestionChip
 import androidx.compose.material3.SuggestionChipDefaults
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -73,10 +74,16 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.phrasevoice.data.model.Phrase
+import com.phrasevoice.domain.text.TextOptimizationAction
+import com.phrasevoice.domain.tts.ReadingPreset
+import com.phrasevoice.domain.tts.ReadingPresets
 import com.phrasevoice.ui.i18n.localizedEdgeStyleName
 import com.phrasevoice.ui.i18n.localizedHomeErrorMessage
 import com.phrasevoice.ui.i18n.localizedPhraseTitle
+import com.phrasevoice.ui.i18n.localizedProviderHealthDescription
+import com.phrasevoice.ui.i18n.localizedProviderHealthLabel
 import com.phrasevoice.ui.i18n.t
+import kotlin.math.abs
 
 @Composable
 fun VoiceWaveIndicator(
@@ -129,17 +136,24 @@ fun HomeScreen(
     onSpeedChange: (Float) -> Unit,
     onPitchChange: (Float) -> Unit,
     onVolumeChange: (Float) -> Unit,
+    onReadingPresetSelected: (ReadingPreset) -> Unit,
+    onTextOptimizationSelected: (TextOptimizationAction) -> Unit,
+    onMimoSmartTextOptimizationChange: (Boolean) -> Unit,
     onSpeak: () -> Unit,
+    onPreviewVoice: () -> Unit,
     onStop: () -> Unit,
     onSaveAudio: () -> Unit,
     onQuickPhraseClick: (Phrase) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
+    val selectedProvider = state.providers.firstOrNull { it.id == state.selectedProviderId }
     val androidTtsUnavailable = state.selectedProviderId == "android_system" && !state.androidTtsReady
+    val selectedProviderUnavailable = selectedProvider?.enabled == false
     val canRunTts = state.status != HomeStatus.Loading &&
             state.status != HomeStatus.Saving &&
-            !androidTtsUnavailable
+            !androidTtsUnavailable &&
+            selectedProvider?.enabled == true
     val shareTitle = t("分享音频", "Share Audio")
 
     Column(
@@ -181,6 +195,20 @@ fun HomeScreen(
             ),
             modifier = Modifier.fillMaxWidth().heightIn(min = 180.dp),
         )
+
+        TextOptimizationRow(
+            enabled = state.text.isNotBlank(),
+            feedback = state.textOptimizationFeedback,
+            onTextOptimizationSelected = onTextOptimizationSelected,
+        )
+
+        if (state.mimoSmartTextOptimizationAvailable) {
+            MimoSmartTextOptimizationRow(
+                checked = state.mimoSmartTextOptimizationEnabled,
+                enabled = state.status != HomeStatus.Loading && state.status != HomeStatus.Saving,
+                onCheckedChange = onMimoSmartTextOptimizationChange,
+            )
+        }
 
         // 2. Control Actions Card (开始朗读 / 保存)
         Card(
@@ -271,7 +299,11 @@ fun HomeScreen(
         }
 
         // Status Error Alerts
-        if (state.status == HomeStatus.Error || !state.errorMessage.isNullOrBlank() || androidTtsUnavailable) {
+        if (state.status == HomeStatus.Error ||
+            !state.errorMessage.isNullOrBlank() ||
+            androidTtsUnavailable ||
+            selectedProviderUnavailable
+        ) {
             Card(
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
                 border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.3f)),
@@ -284,6 +316,12 @@ fun HomeScreen(
                             t(
                                 "系统 TTS 未就绪，请在系统设置中启用或更换 Provider",
                                 "System TTS is not ready. Enable it in system settings or switch Provider.",
+                            )
+                        } else if (selectedProviderUnavailable && selectedProvider != null) {
+                            localizedProviderHealthDescription(
+                                status = selectedProvider.status,
+                                providerName = selectedProvider.name,
+                                androidTtsMessage = state.androidTtsMessage,
                             )
                         } else {
                             state.errorMessage?.let { localizedHomeErrorMessage(it) }
@@ -330,6 +368,11 @@ fun HomeScreen(
             }
         }
 
+        ReadingPresetRow(
+            state = state,
+            onReadingPresetSelected = onReadingPresetSelected,
+        )
+
         // 4. Engine Configuration Card (声音引擎配置)
         Card(
             colors = CardDefaults.cardColors(
@@ -364,6 +407,17 @@ fun HomeScreen(
                         state = state,
                         onVoiceStyleSelected = onVoiceStyleSelected,
                     )
+                }
+
+                OutlinedButton(
+                    onClick = onPreviewVoice,
+                    enabled = canRunTts,
+                    shape = RoundedCornerShape(16.dp),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                    modifier = Modifier.fillMaxWidth().height(48.dp),
+                ) {
+                    Icon(Icons.Outlined.PlayArrow, contentDescription = null, modifier = Modifier.padding(end = 8.dp))
+                    Text(t("试听当前声音", "Preview Current Voice"), fontWeight = FontWeight.SemiBold)
                 }
             }
         }
@@ -415,6 +469,155 @@ fun HomeScreen(
     }
 }
 
+@Composable
+private fun TextOptimizationRow(
+    enabled: Boolean,
+    feedback: TextOptimizationFeedback?,
+    onTextOptimizationSelected: (TextOptimizationAction) -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(
+            text = t("文本工具", "Text Tools"),
+            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.8f),
+        )
+        LazyRow(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            items(TextOptimizationAction.entries, key = { it.name }) { action ->
+                SuggestionChip(
+                    onClick = { onTextOptimizationSelected(action) },
+                    enabled = enabled,
+                    label = {
+                        Text(
+                            text = textOptimizationLabel(action),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            fontWeight = FontWeight.Medium,
+                        )
+                    },
+                    shape = RoundedCornerShape(12.dp),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                    colors = SuggestionChipDefaults.suggestionChipColors(
+                        containerColor = MaterialTheme.colorScheme.surface,
+                    ),
+                )
+            }
+        }
+        feedback?.let {
+            Text(
+                text = textOptimizationFeedbackLabel(it),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.primary,
+            )
+        }
+    }
+}
+
+@Composable
+private fun MimoSmartTextOptimizationRow(
+    checked: Boolean,
+    enabled: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(
+                text = t("MiMo 智能文本优化", "MiMo Smart Text Optimization"),
+                style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.85f),
+            )
+            Text(
+                text = t(
+                    "开启后，正式朗读会让 MiMo 先优化文本；关闭时严格按原文朗读。",
+                    "When enabled, real reading lets MiMo optimize the text first; when off, it reads the original text.",
+                ),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Switch(
+            checked = checked,
+            onCheckedChange = onCheckedChange,
+            enabled = enabled,
+        )
+    }
+}
+
+@Composable
+private fun ReadingPresetRow(
+    state: HomeUiState,
+    onReadingPresetSelected: (ReadingPreset) -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(
+            text = t("朗读场景", "Reading Presets"),
+            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.8f),
+        )
+        LazyRow(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            items(ReadingPresets.all, key = { it.id }) { preset ->
+                FilterChip(
+                    selected = state.matchesPreset(preset),
+                    onClick = { onReadingPresetSelected(preset) },
+                    label = {
+                        Text(
+                            text = readingPresetLabel(preset.id),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    },
+                    shape = RoundedCornerShape(12.dp),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun textOptimizationLabel(action: TextOptimizationAction): String =
+    when (action) {
+        TextOptimizationAction.OneTapPolish -> t("一键优化", "Polish")
+        TextOptimizationAction.CleanWhitespace -> t("清理空白", "Clean Spacing")
+        TextOptimizationAction.AddReadingBreaks -> t("朗读分段", "Add Pauses")
+        TextOptimizationAction.MixedLanguageSpacing -> t("中英间隔", "CJK/EN Spacing")
+    }
+
+@Composable
+private fun readingPresetLabel(id: String): String =
+    when (id) {
+        ReadingPresets.NATURAL -> t("自然播报", "Natural")
+        ReadingPresets.GENTLE -> t("温柔讲解", "Gentle")
+        ReadingPresets.NOTICE -> t("客服通知", "Notice")
+        ReadingPresets.SHORT_VIDEO -> t("短视频旁白", "Short Video")
+        ReadingPresets.ROLE_PLAY -> t("角色扮演", "Role Play")
+        ReadingPresets.ENGLISH_PRACTICE -> t("英语跟读", "English Practice")
+        else -> id
+    }
+
+@Composable
+private fun textOptimizationFeedbackLabel(feedback: TextOptimizationFeedback): String =
+    when (feedback) {
+        TextOptimizationFeedback.CleanedWhitespace -> t("已清理空白", "Whitespace cleaned")
+        TextOptimizationFeedback.AddedReadingBreaks -> t("已添加朗读分段", "Reading breaks added")
+        TextOptimizationFeedback.AddedMixedLanguageSpacing -> t("已整理中英间隔", "CJK/English spacing updated")
+        TextOptimizationFeedback.Polished -> t("已一键优化朗读文本", "Text polished for reading")
+        TextOptimizationFeedback.NoChange -> t("文本已经适合朗读，无需调整", "Text already looks ready for reading")
+    }
+
+private fun HomeUiState.matchesPreset(preset: ReadingPreset): Boolean =
+    abs(speed - preset.speed) < 0.01f &&
+        abs(pitch - preset.pitch) < 0.01f &&
+        abs(volume - preset.volume) < 0.01f
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun ProviderDropdown(
@@ -452,7 +655,7 @@ private fun ProviderDropdown(
             state.providers.forEach { provider ->
                 DropdownMenuItem(
                     text = {
-                        val note = if (provider.note == "未启用") t("未启用", "Disabled") else provider.note
+                        val note = provider.note?.let { localizedProviderHealthLabel(provider.status) }
                         Text(
                             text = listOfNotNull(provider.name, note).joinToString(" · "),
                         )

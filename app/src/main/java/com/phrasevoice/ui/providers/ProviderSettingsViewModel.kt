@@ -11,6 +11,7 @@ import com.phrasevoice.data.model.ProviderConfig
 import com.phrasevoice.data.repository.ProviderConfigRepository
 import com.phrasevoice.data.repository.RuntimeProviderConfig
 import com.phrasevoice.data.tts.AudioPlaybackController
+import com.phrasevoice.data.tts.AndroidSystemTtsProvider
 import com.phrasevoice.data.tts.CloudTtsService
 import com.phrasevoice.data.tts.MimoTtsCatalog
 import com.phrasevoice.debug.AppLogger
@@ -46,6 +47,8 @@ data class ProviderSettingsUiState(
     val savedMessage: String? = null,
     val isTesting: Boolean = false,
     val isOptimizingVoiceDesign: Boolean = false,
+    val androidTtsReady: Boolean = true,
+    val androidTtsMessage: String? = null,
 ) {
     val selectedConfig: ProviderConfig?
         get() = configs.firstOrNull { it.providerId == selectedProviderId }
@@ -70,6 +73,7 @@ class ProviderSettingsViewModel(
     private val providerConfigRepository: ProviderConfigRepository,
     private val cloudTtsService: CloudTtsService,
     private val audioPlaybackController: AudioPlaybackController,
+    private val systemTtsProvider: AndroidSystemTtsProvider,
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(ProviderSettingsUiState())
     val uiState: StateFlow<ProviderSettingsUiState> = _uiState
@@ -84,6 +88,15 @@ class ProviderSettingsViewModel(
                     val selected = configs.first { it.providerId == selectedId }
                     current.copy(configs = configs).withSelectedConfig(selected)
                 }
+            }
+        }
+        viewModelScope.launch {
+            val readiness = systemTtsProvider.readiness()
+            _uiState.update {
+                it.copy(
+                    androidTtsReady = readiness.ready,
+                    androidTtsMessage = readiness.message,
+                )
             }
         }
     }
@@ -383,6 +396,7 @@ class ProviderSettingsViewModel(
                     volume = 1.0f,
                     stylePrompt = "自然、清晰、适合日常交流",
                     outputFormat = if (state.isGemini || state.isMimo) AudioFormat.WAV else AudioFormat.MP3,
+                    mimoOptimizeTextPreview = state.isMimoVoiceDesign && state.mimoOptimizeTextPreviewDraft,
                 )
                 when (val result = cloudTtsService.synthesize(request, runtimeConfig, cache = true)) {
                     is TtsResult.AudioFile -> {

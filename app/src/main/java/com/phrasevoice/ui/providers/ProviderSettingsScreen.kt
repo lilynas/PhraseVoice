@@ -56,9 +56,15 @@ import androidx.compose.ui.unit.dp
 import com.phrasevoice.data.model.CustomHttpResponseType
 import com.phrasevoice.data.model.ProviderConfig
 import com.phrasevoice.data.repository.ProviderConfigRepository
+import com.phrasevoice.data.repository.ProviderHealthStatus
+import com.phrasevoice.data.repository.isReady
+import com.phrasevoice.data.repository.providerHealthForConfig
+import com.phrasevoice.data.repository.providerHealthForDraft
 import com.phrasevoice.data.tts.EdgeForwarderCatalog
 import com.phrasevoice.data.tts.GeminiTtsCatalog
 import com.phrasevoice.data.tts.MimoTtsCatalog
+import com.phrasevoice.ui.i18n.localizedProviderHealthDescription
+import com.phrasevoice.ui.i18n.localizedProviderHealthLabel
 import com.phrasevoice.ui.i18n.localizedProviderStatusMessage
 import com.phrasevoice.ui.i18n.t
 
@@ -91,6 +97,14 @@ fun ProviderSettingsScreen(
     onTestVoice: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val selectedHealth = providerHealthForDraft(
+        providerId = state.selectedProviderId,
+        enabled = state.enabledDraft,
+        hasApiKey = state.hasSavedApiKey || state.apiKeyDraft.isNotBlank(),
+        baseUrl = state.baseUrlDraft,
+        androidTtsReady = state.androidTtsReady,
+    )
+
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -139,6 +153,12 @@ fun ProviderSettingsScreen(
                         enabled = state.selectedProviderId != ProviderConfigRepository.ANDROID_SYSTEM,
                     )
                 }
+
+                ProviderHealthSummary(
+                    status = selectedHealth,
+                    providerName = providerLabel(state.selectedProviderId),
+                    androidTtsMessage = state.androidTtsMessage,
+                )
 
                 when (state.selectedProviderId) {
                     ProviderConfigRepository.ANDROID_SYSTEM -> {
@@ -297,7 +317,9 @@ fun ProviderSettingsScreen(
                         }
                         OutlinedButton(
                             onClick = onTestVoice,
-                            enabled = !state.isTesting && !state.isOptimizingVoiceDesign,
+                            enabled = selectedHealth.isReady &&
+                                !state.isTesting &&
+                                !state.isOptimizingVoiceDesign,
                             modifier = Modifier.fillMaxWidth(),
                         ) {
                             Icon(Icons.Outlined.PlayArrow, contentDescription = null)
@@ -470,8 +492,8 @@ private fun MimoVoiceDesignFields(
             Text(t("试听文本智能优化", "Smart Preview Text Optimization"))
             Text(
                 t(
-                    "开启后 MiMo 会在 VoiceDesign 试听/朗读时优化目标文本；音色描述仍以上方内容为准。",
-                    "When enabled, MiMo optimizes the target text for VoiceDesign preview/reading; the voice description above remains unchanged.",
+                    "只影响本页的 VoiceDesign 试听；正式朗读请在朗读页单独开启 MiMo 智能文本优化。",
+                    "Only affects VoiceDesign preview on this page; enable MiMo smart text optimization separately on the Read page for real reading.",
                 ),
                 style = MaterialTheme.typography.bodySmall,
             )
@@ -525,6 +547,10 @@ private fun ProviderSelectorDropdown(
             modifier = Modifier.fillMaxWidth()
         ) {
             state.configs.forEach { config ->
+                val health = providerHealthForConfig(
+                    config = config,
+                    androidTtsReady = state.androidTtsReady,
+                )
                 DropdownMenuItem(
                     text = {
                         Row(
@@ -543,14 +569,10 @@ private fun ProviderSelectorDropdown(
                                 )
                             }
                             Text(
-                                text = if (config.enabled) t("已启用", "Enabled") else t("未启用", "Disabled"),
+                                text = localizedProviderHealthLabel(health),
                                 style = MaterialTheme.typography.bodyMedium.copy(
                                     fontWeight = FontWeight.Bold,
-                                    color = if (config.enabled) {
-                                        MaterialTheme.colorScheme.primary
-                                    } else {
-                                        MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
-                                    }
+                                    color = providerHealthColor(health),
                                 ),
                                 modifier = Modifier.padding(end = 4.dp)
                             )
@@ -565,6 +587,43 @@ private fun ProviderSelectorDropdown(
         }
     }
 }
+
+@Composable
+private fun ProviderHealthSummary(
+    status: ProviderHealthStatus,
+    providerName: String,
+    androidTtsMessage: String?,
+) {
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        Text(
+            text = localizedProviderHealthLabel(status),
+            style = MaterialTheme.typography.bodyLarge.copy(
+                fontWeight = FontWeight.Bold,
+                color = providerHealthColor(status),
+            ),
+        )
+        Text(
+            text = localizedProviderHealthDescription(
+                status = status,
+                providerName = providerName,
+                androidTtsMessage = androidTtsMessage,
+            ),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+@Composable
+private fun providerHealthColor(status: ProviderHealthStatus) =
+    when {
+        status.isReady -> MaterialTheme.colorScheme.primary
+        status == ProviderHealthStatus.Disabled -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+        else -> MaterialTheme.colorScheme.error
+    }
 
 @Composable
 private fun ProviderIcon(providerId: String) {

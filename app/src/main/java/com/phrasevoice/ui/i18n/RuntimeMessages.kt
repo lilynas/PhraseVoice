@@ -3,6 +3,7 @@ package com.phrasevoice.ui.i18n
 import androidx.compose.runtime.Composable
 import com.phrasevoice.data.model.Phrase
 import com.phrasevoice.data.model.PhraseGroup
+import com.phrasevoice.data.repository.ProviderHealthStatus
 import com.phrasevoice.data.tts.EdgeForwarderStyle
 
 private val importedPhrasesRegex =
@@ -46,8 +47,66 @@ fun localizedHomeErrorMessage(message: String): String {
         val providerName = message.removeSuffix(disabledSuffix)
         return t(message, "$providerName is not enabled. Save its configuration on the Provider page first.")
     }
+    val notConfiguredSuffix = " 未配置，请先在 Provider 页面启用并保存。"
+    if (message.endsWith(notConfiguredSuffix)) {
+        val providerName = message.removeSuffix(notConfiguredSuffix)
+        return t(message, "$providerName is not configured. Enable and save it on the Provider page first.")
+    }
+    val missingApiKeySuffix = " 缺少 API Key，请先在 Provider 页面保存 API Key。"
+    if (message.endsWith(missingApiKeySuffix)) {
+        val providerName = message.removeSuffix(missingApiKeySuffix)
+        return t(message, "$providerName is missing an API key. Save the API key on the Provider page first.")
+    }
+    val missingBaseUrlSuffix = " 缺少 Base URL，请先在 Provider 页面填写服务地址。"
+    if (message.endsWith(missingBaseUrlSuffix)) {
+        val providerName = message.removeSuffix(missingBaseUrlSuffix)
+        return t(message, "$providerName is missing a Base URL. Enter the service URL on the Provider page first.")
+    }
     return localizedRuntimeMessage(message)
 }
+
+@Composable
+fun localizedProviderHealthLabel(status: ProviderHealthStatus): String =
+    when (status) {
+        ProviderHealthStatus.Ready -> t("可用", "Ready")
+        ProviderHealthStatus.Disabled -> t("未配置", "Not configured")
+        ProviderHealthStatus.MissingApiKey -> t("缺少 API Key", "Missing API key")
+        ProviderHealthStatus.MissingBaseUrl -> t("缺少 Base URL", "Missing Base URL")
+        ProviderHealthStatus.SystemUnavailable -> t("系统 TTS 不可用", "System TTS unavailable")
+    }
+
+@Composable
+fun localizedProviderHealthDescription(
+    status: ProviderHealthStatus,
+    providerName: String,
+    androidTtsMessage: String? = null,
+): String =
+    when (status) {
+        ProviderHealthStatus.Ready -> t(
+            "$providerName 已准备好，可以保存并试听。",
+            "$providerName is ready. Save and test when you want to confirm the voice.",
+        )
+        ProviderHealthStatus.Disabled -> t(
+            "打开开关并保存后，$providerName 才会出现在朗读流程里。",
+            "Turn it on and save before using $providerName on the Read page.",
+        )
+        ProviderHealthStatus.MissingApiKey -> t(
+            "请填写并保存 API Key，然后再试听 $providerName。",
+            "Enter and save the API key before testing $providerName.",
+        )
+        ProviderHealthStatus.MissingBaseUrl -> t(
+            "请填写服务地址，然后再试听 $providerName。",
+            "Enter the service URL before testing $providerName.",
+        )
+        ProviderHealthStatus.SystemUnavailable -> if (!androidTtsMessage.isNullOrBlank()) {
+            localizedRuntimeMessage(androidTtsMessage)
+        } else {
+            t(
+                "请在系统设置中启用语音引擎，或切换到云端 Provider。",
+                "Enable a speech engine in system settings, or switch to a cloud Provider.",
+            )
+        }
+    }
 
 @Composable
 fun localizedProviderStatusMessage(message: String): String {

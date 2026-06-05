@@ -70,6 +70,7 @@ import androidx.compose.ui.unit.dp
 import com.phrasevoice.BuildConfig
 import com.phrasevoice.debug.DebugLogEntry
 import com.phrasevoice.ui.i18n.AppLanguageMode
+import com.phrasevoice.ui.i18n.localizedProviderHealthLabel
 import com.phrasevoice.ui.i18n.localizedSettingsStatusMessage
 import com.phrasevoice.ui.i18n.t
 import java.text.SimpleDateFormat
@@ -350,7 +351,7 @@ private fun DefaultProviderDropdown(
             providers.forEach { provider ->
                 DropdownMenuItem(
                     text = {
-                        val note = if (!provider.enabled) t("未启用", "Disabled") else provider.note
+                        val note = provider.note?.let { localizedProviderHealthLabel(provider.status) }
                         Text(
                             text = listOfNotNull(provider.name, note).joinToString(" · "),
                             maxLines = 1,

@@ -11,7 +11,10 @@ import com.phrasevoice.data.model.Phrase
 import com.phrasevoice.data.repository.HistoryRepository
 import com.phrasevoice.data.repository.PhraseRepository
 import com.phrasevoice.data.repository.ProviderConfigRepository
+import com.phrasevoice.data.repository.ProviderHealthStatus
 import com.phrasevoice.data.repository.SettingsRepository
+import com.phrasevoice.data.repository.isReady
+import com.phrasevoice.data.repository.providerHealthForConfig
 import com.phrasevoice.data.tts.AudioPlaybackController
 import com.phrasevoice.data.tts.AndroidSystemTtsProvider
 import com.phrasevoice.data.tts.CloudTtsService
@@ -20,7 +23,10 @@ import com.phrasevoice.data.tts.EdgeForwarderStyle
 import com.phrasevoice.data.tts.GeminiTtsCatalog
 import com.phrasevoice.data.tts.MimoTtsCatalog
 import com.phrasevoice.debug.AppLogger
+import com.phrasevoice.domain.text.TextOptimizationAction
+import com.phrasevoice.domain.text.TextOptimizer
 import com.phrasevoice.domain.model.AudioFormat
+import com.phrasevoice.domain.tts.ReadingPreset
 import com.phrasevoice.domain.tts.TtsRequest
 import com.phrasevoice.domain.tts.TtsResult
 import com.phrasevoice.domain.tts.TtsVoice
@@ -40,10 +46,19 @@ enum class HomeStatus {
     Error,
 }
 
+enum class TextOptimizationFeedback {
+    CleanedWhitespace,
+    AddedReadingBreaks,
+    AddedMixedLanguageSpacing,
+    Polished,
+    NoChange,
+}
+
 data class TtsProviderOption(
     val id: String,
     val name: String,
     val enabled: Boolean = true,
+    val status: ProviderHealthStatus = ProviderHealthStatus.Ready,
     val note: String? = null,
 )
 
@@ -65,6 +80,9 @@ data class HomeUiState(
     val lastAudioMimeType: String? = null,
     val androidTtsReady: Boolean = true,
     val androidTtsMessage: String? = null,
+    val textOptimizationFeedback: TextOptimizationFeedback? = null,
+    val mimoSmartTextOptimizationAvailable: Boolean = false,
+    val mimoSmartTextOptimizationEnabled: Boolean = false,
 )
 
 class HomeViewModel(
@@ -88,12 +106,28 @@ class HomeViewModel(
         }
         viewModelScope.launch {
             settingsRepository.settings.collect { settings ->
-                _uiState.update {
-                    it.copy(
+                _uiState.update { state ->
+                    val providerId = settings.defaultProviderId
+                    val voices = voicesFor(providerId)
+                    val styles = stylesFor(providerId)
+                    val mimoSmartTextOptimizationAvailable =
+                        isMimoSmartTextOptimizationAvailable(providerId)
+                    state.copy(
                         selectedProviderId = settings.defaultProviderId,
+                        voices = voices,
+                        selectedVoiceId = state.selectedVoiceId
+                            ?.takeIf { voiceId -> voices.any { it.id == voiceId } }
+                            ?: voices.firstOrNull()?.id,
+                        voiceStyles = styles,
+                        selectedVoiceStyleId = state.selectedVoiceStyleId
+                            ?.takeIf { styleId -> styles.any { it.id == styleId } }
+                            ?: styles.firstOrNull()?.id,
                         speed = settings.defaultSpeed,
                         pitch = settings.defaultPitch,
                         volume = settings.defaultVolume,
+                        mimoSmartTextOptimizationAvailable = mimoSmartTextOptimizationAvailable,
+                        mimoSmartTextOptimizationEnabled =
+                            state.mimoSmartTextOptimizationEnabled && mimoSmartTextOptimizationAvailable,
                     )
                 }
             }
@@ -113,6 +147,8 @@ class HomeViewModel(
                         ?: ProviderConfigRepository.ANDROID_SYSTEM
                     val voices = voicesFor(selectedProviderId)
                     val styles = stylesFor(selectedProviderId)
+                    val mimoSmartTextOptimizationAvailable =
+                        isMimoSmartTextOptimizationAvailable(selectedProviderId, configs)
                     state.copy(
                         providers = providers,
                         selectedProviderId = selectedProviderId,
@@ -124,6 +160,9 @@ class HomeViewModel(
                         selectedVoiceStyleId = state.selectedVoiceStyleId
                             ?.takeIf { styleId -> styles.any { it.id == styleId } }
                             ?: styles.firstOrNull()?.id,
+                        mimoSmartTextOptimizationAvailable = mimoSmartTextOptimizationAvailable,
+                        mimoSmartTextOptimizationEnabled =
+                            state.mimoSmartTextOptimizationEnabled && mimoSmartTextOptimizationAvailable,
                     )
                 }
             }
@@ -180,6 +219,7 @@ class HomeViewModel(
                 status = HomeStatus.Idle,
                 lastAudioUri = null,
                 lastAudioMimeType = null,
+                textOptimizationFeedback = null,
             )
         }
     }
@@ -188,6 +228,7 @@ class HomeViewModel(
         val option = uiState.value.providers.firstOrNull { it.id == providerId } ?: return
         val voices = voicesFor(providerId)
         val styles = stylesFor(providerId)
+        val mimoSmartTextOptimizationAvailable = isMimoSmartTextOptimizationAvailable(providerId)
         AppLogger.i(TAG, "selectProvider id=$providerId enabled=${option.enabled}")
         _uiState.update {
             val androidUnavailable = providerId == ProviderConfigRepository.ANDROID_SYSTEM && !it.androidTtsReady
@@ -199,15 +240,19 @@ class HomeViewModel(
                 selectedVoiceStyleId = styles.firstOrNull()?.id,
                 lastAudioUri = null,
                 lastAudioMimeType = null,
+                textOptimizationFeedback = null,
+                mimoSmartTextOptimizationAvailable = mimoSmartTextOptimizationAvailable,
+                mimoSmartTextOptimizationEnabled =
+                    it.mimoSmartTextOptimizationEnabled && mimoSmartTextOptimizationAvailable,
                 status = when {
                     androidUnavailable -> HomeStatus.Error
-                    option.enabled -> HomeStatus.Idle
+                    option.status.isReady -> HomeStatus.Idle
                     else -> HomeStatus.Error
                 },
                 errorMessage = when {
                     androidUnavailable -> it.androidTtsMessage
-                    option.enabled -> null
-                    else -> "${option.name} 尚未启用，请先在 Provider 页面保存配置。"
+                    option.status.isReady -> null
+                    else -> providerHealthErrorMessage(option.name, option.status)
                 },
             )
         }
@@ -245,8 +290,96 @@ class HomeViewModel(
         _uiState.update { it.copy(volume = value) }
     }
 
+    fun applyReadingPreset(preset: ReadingPreset) {
+        _uiState.update { state ->
+            val presetStyleId = preset.edgeStyleId
+                ?.takeIf { styleId -> state.voiceStyles.any { it.id == styleId } }
+            state.copy(
+                speed = preset.speed,
+                pitch = preset.pitch,
+                volume = preset.volume,
+                selectedVoiceStyleId = presetStyleId ?: state.selectedVoiceStyleId,
+                errorMessage = null,
+                status = HomeStatus.Idle,
+            )
+        }
+    }
+
+    fun optimizeText(action: TextOptimizationAction) {
+        _uiState.update { state ->
+            val optimized = TextOptimizer.apply(state.text, action)
+            state.copy(
+                text = optimized,
+                errorMessage = null,
+                status = HomeStatus.Idle,
+                lastAudioUri = null,
+                lastAudioMimeType = null,
+                textOptimizationFeedback = if (optimized == state.text) {
+                    TextOptimizationFeedback.NoChange
+                } else {
+                    textOptimizationFeedbackFor(action)
+                },
+            )
+        }
+    }
+
+    fun updateMimoSmartTextOptimization(enabled: Boolean) {
+        _uiState.update { state ->
+            state.copy(
+                mimoSmartTextOptimizationEnabled = enabled && state.mimoSmartTextOptimizationAvailable,
+                errorMessage = null,
+                status = HomeStatus.Idle,
+            )
+        }
+    }
+
     fun speak() {
         speakText(uiState.value.text)
+    }
+
+    fun previewVoice() {
+        viewModelScope.launch {
+            val sampleText = "你好，这是 PhraseVoice 的声音试听。Hello, this is a voice preview."
+            _uiState.update { it.copy(status = HomeStatus.Loading, errorMessage = null) }
+            val request = currentRequest(
+                text = sampleText,
+                outputFormat = outputFormatForSelectedProvider(),
+            )
+            AppLogger.i(
+                TAG,
+                "preview start provider=${request.providerId} voice=${request.voiceId.orEmpty()}",
+            )
+            when (val result = synthesizeForCurrentProvider(request, playAudioFile = true)) {
+                is TtsResult.LocalPlaybackStarted -> {
+                    _uiState.update {
+                        it.copy(
+                            status = HomeStatus.Playing,
+                            errorMessage = null,
+                            lastAudioUri = null,
+                            lastAudioMimeType = null,
+                        )
+                    }
+                }
+
+                is TtsResult.AudioFile -> {
+                    _uiState.update {
+                        it.copy(
+                            status = HomeStatus.Playing,
+                            lastAudioUri = result.uri.toString(),
+                            lastAudioMimeType = result.mimeType,
+                            errorMessage = null,
+                        )
+                    }
+                }
+
+                is TtsResult.Error -> {
+                    AppLogger.e(TAG, "preview failed provider=${request.providerId}: ${result.message}", result.cause)
+                    _uiState.update {
+                        it.copy(status = HomeStatus.Error, errorMessage = result.message)
+                    }
+                }
+            }
+        }
     }
 
     fun speakPhrase(phraseId: String, text: String) {
@@ -449,16 +582,54 @@ class HomeViewModel(
                 ?.takeIf { state.selectedProviderId == ProviderConfigRepository.EDGE_TTS_FORWARDER }
                 ?.takeIf { it.isNotBlank() },
             outputFormat = outputFormat,
+            mimoOptimizeTextPreview =
+                state.mimoSmartTextOptimizationEnabled && state.mimoSmartTextOptimizationAvailable,
         )
     }
+
+    private fun isMimoSmartTextOptimizationAvailable(
+        providerId: String,
+        configs: List<ProviderConfig> = providerConfigs,
+    ): Boolean {
+        val config = configs.firstOrNull { it.providerId == providerId } ?: return false
+        return config.providerId == ProviderConfigRepository.MIMO &&
+            MimoTtsCatalog.isVoiceDesignModel(config.model)
+    }
+
+    private fun textOptimizationFeedbackFor(action: TextOptimizationAction): TextOptimizationFeedback =
+        when (action) {
+            TextOptimizationAction.CleanWhitespace -> TextOptimizationFeedback.CleanedWhitespace
+            TextOptimizationAction.AddReadingBreaks -> TextOptimizationFeedback.AddedReadingBreaks
+            TextOptimizationAction.MixedLanguageSpacing -> TextOptimizationFeedback.AddedMixedLanguageSpacing
+            TextOptimizationAction.OneTapPolish -> TextOptimizationFeedback.Polished
+        }
 
     private fun ProviderConfig.toProviderOption(
         androidTtsReady: Boolean = true,
         androidTtsMessage: String? = null,
-    ): TtsProviderOption =
-        TtsProviderOption(
+    ): TtsProviderOption {
+        val status = providerHealthForConfig(
+            config = this,
+            androidTtsReady = androidTtsReady,
+        )
+        return TtsProviderOption(
             id = providerId,
-            name = when (providerId) {
+            name = providerLabel(providerId),
+            enabled = status.isReady,
+            status = status,
+            note = when (status) {
+                ProviderHealthStatus.Ready -> null
+                ProviderHealthStatus.Disabled -> "未配置"
+                ProviderHealthStatus.MissingApiKey -> "缺少 API Key"
+                ProviderHealthStatus.MissingBaseUrl -> "缺少 Base URL"
+                ProviderHealthStatus.SystemUnavailable ->
+                    androidTtsMessage ?: "系统 TTS 不可用"
+            },
+        )
+    }
+
+    private fun providerLabel(providerId: String): String =
+        when (providerId) {
                 ProviderConfigRepository.ANDROID_SYSTEM -> "Android System TTS"
                 ProviderConfigRepository.OPENAI -> "OpenAI TTS"
                 ProviderConfigRepository.EDGE_TTS_FORWARDER -> "Edge TTS Forwarder"
@@ -466,19 +637,19 @@ class HomeViewModel(
                 ProviderConfigRepository.MIMO -> "MiMo TTS"
                 ProviderConfigRepository.CUSTOM_HTTP -> "Custom TTS API"
                 else -> providerId
-            },
-            enabled = if (providerId == ProviderConfigRepository.ANDROID_SYSTEM) {
-                enabled && androidTtsReady
-            } else {
-                enabled
-            },
-            note = when {
-                providerId == ProviderConfigRepository.ANDROID_SYSTEM && !androidTtsReady ->
-                    androidTtsMessage ?: "系统 TTS 不可用"
-                !enabled -> "未启用"
-                else -> null
-            },
-        )
+        }
+
+    private fun providerHealthErrorMessage(
+        providerName: String,
+        status: ProviderHealthStatus,
+    ): String =
+        when (status) {
+            ProviderHealthStatus.Ready -> ""
+            ProviderHealthStatus.Disabled -> "$providerName 未配置，请先在 Provider 页面启用并保存。"
+            ProviderHealthStatus.MissingApiKey -> "$providerName 缺少 API Key，请先在 Provider 页面保存 API Key。"
+            ProviderHealthStatus.MissingBaseUrl -> "$providerName 缺少 Base URL，请先在 Provider 页面填写服务地址。"
+            ProviderHealthStatus.SystemUnavailable -> "Android 系统 TTS 暂不可用。"
+        }
 
     private fun voicesFor(providerId: String): List<TtsVoice> =
         when (providerId) {
