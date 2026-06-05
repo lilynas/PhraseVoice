@@ -161,6 +161,7 @@ fun PhraseVoiceRoot(container: AppContainer) {
                             onVolumeChange = homeViewModel::updateVolume,
                             onReadingPresetSelected = homeViewModel::applyReadingPreset,
                             onTextOptimizationSelected = homeViewModel::optimizeText,
+                            onMimoSmartTextOptimizationChange = homeViewModel::updateMimoSmartTextOptimization,
                             onSpeak = homeViewModel::speak,
                             onPreviewVoice = homeViewModel::previewVoice,
                             onStop = homeViewModel::stop,

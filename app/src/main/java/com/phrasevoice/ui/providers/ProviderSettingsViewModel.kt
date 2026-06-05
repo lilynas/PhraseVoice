@@ -396,6 +396,7 @@ class ProviderSettingsViewModel(
                     volume = 1.0f,
                     stylePrompt = "自然、清晰、适合日常交流",
                     outputFormat = if (state.isGemini || state.isMimo) AudioFormat.WAV else AudioFormat.MP3,
+                    mimoOptimizeTextPreview = state.isMimoVoiceDesign && state.mimoOptimizeTextPreviewDraft,
                 )
                 when (val result = cloudTtsService.synthesize(request, runtimeConfig, cache = true)) {
                     is TtsResult.AudioFile -> {

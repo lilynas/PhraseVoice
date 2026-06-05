@@ -12,4 +12,5 @@ data class TtsRequest(
     val volume: Float,
     val stylePrompt: String? = null,
     val outputFormat: AudioFormat = AudioFormat.MP3,
+    val mimoOptimizeTextPreview: Boolean = false,
 )

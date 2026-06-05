@@ -4,6 +4,7 @@ object TextOptimizer {
     private val horizontalWhitespace = Regex("[\\t\\x0B\\f\\r ]+")
     private val repeatedBlankLines = Regex("\\n{3,}")
     private val sentenceBreak = Regex("([。！？!?；;])\\s*([^\\n])")
+    private val readablePause = Regex("([，、,：:])\\s*([^\\s\\n])")
     private val cjkBeforeAscii = Regex("([\\p{IsHan}])([A-Za-z0-9])")
     private val asciiBeforeCjk = Regex("([A-Za-z0-9])([\\p{IsHan}])")
 
@@ -37,6 +38,21 @@ object TextOptimizer {
             .let { cjkBeforeAscii.replace(it, "$1 $2") }
             .let { asciiBeforeCjk.replace(it, "$1 $2") }
 
+    fun addReadablePauseSpacing(text: String): String =
+        cleanWhitespace(text).let { cleaned ->
+            readablePause.replace(cleaned) { match ->
+                val punctuation = match.groupValues[1]
+                val next = match.groupValues[2]
+                val previous = cleaned.getOrNull(match.range.first - 1)
+                val keepOriginal = when (punctuation) {
+                    "," -> previous?.isDigit() == true && next.first().isDigit()
+                    ":" -> next == "/" || (previous?.isDigit() == true && next.first().isDigit())
+                    else -> false
+                }
+                if (keepOriginal) match.value else "$punctuation $next"
+            }
+        }
+
     fun polish(text: String): String =
-        addReadingBreaks(addMixedLanguageSpacing(text))
+        addReadingBreaks(addReadablePauseSpacing(addMixedLanguageSpacing(text)))
 }

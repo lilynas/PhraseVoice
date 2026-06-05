@@ -298,7 +298,7 @@ class CloudTtsService(
             JsonObject(
                 mapOf(
                     "format" to JsonPrimitive(responseFormat),
-                    "optimize_text_preview" to JsonPrimitive(settings.optimizeTextPreview),
+                    "optimize_text_preview" to JsonPrimitive(request.mimoOptimizeTextPreview),
                 ),
             )
         } else {

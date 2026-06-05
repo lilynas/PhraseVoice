@@ -58,6 +58,7 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.SuggestionChip
 import androidx.compose.material3.SuggestionChipDefaults
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -137,6 +138,7 @@ fun HomeScreen(
     onVolumeChange: (Float) -> Unit,
     onReadingPresetSelected: (ReadingPreset) -> Unit,
     onTextOptimizationSelected: (TextOptimizationAction) -> Unit,
+    onMimoSmartTextOptimizationChange: (Boolean) -> Unit,
     onSpeak: () -> Unit,
     onPreviewVoice: () -> Unit,
     onStop: () -> Unit,
@@ -196,8 +198,17 @@ fun HomeScreen(
 
         TextOptimizationRow(
             enabled = state.text.isNotBlank(),
+            feedback = state.textOptimizationFeedback,
             onTextOptimizationSelected = onTextOptimizationSelected,
         )
+
+        if (state.mimoSmartTextOptimizationAvailable) {
+            MimoSmartTextOptimizationRow(
+                checked = state.mimoSmartTextOptimizationEnabled,
+                enabled = state.status != HomeStatus.Loading && state.status != HomeStatus.Saving,
+                onCheckedChange = onMimoSmartTextOptimizationChange,
+            )
+        }
 
         // 2. Control Actions Card (开始朗读 / 保存)
         Card(
@@ -461,6 +472,7 @@ fun HomeScreen(
 @Composable
 private fun TextOptimizationRow(
     enabled: Boolean,
+    feedback: TextOptimizationFeedback?,
     onTextOptimizationSelected: (TextOptimizationAction) -> Unit,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -493,6 +505,47 @@ private fun TextOptimizationRow(
                 )
             }
         }
+        feedback?.let {
+            Text(
+                text = textOptimizationFeedbackLabel(it),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.primary,
+            )
+        }
+    }
+}
+
+@Composable
+private fun MimoSmartTextOptimizationRow(
+    checked: Boolean,
+    enabled: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(
+                text = t("MiMo 智能文本优化", "MiMo Smart Text Optimization"),
+                style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.85f),
+            )
+            Text(
+                text = t(
+                    "开启后，正式朗读会让 MiMo 先优化文本；关闭时严格按原文朗读。",
+                    "When enabled, real reading lets MiMo optimize the text first; when off, it reads the original text.",
+                ),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Switch(
+            checked = checked,
+            onCheckedChange = onCheckedChange,
+            enabled = enabled,
+        )
     }
 }
 
@@ -545,8 +598,19 @@ private fun readingPresetLabel(id: String): String =
         ReadingPresets.GENTLE -> t("温柔讲解", "Gentle")
         ReadingPresets.NOTICE -> t("客服通知", "Notice")
         ReadingPresets.SHORT_VIDEO -> t("短视频旁白", "Short Video")
+        ReadingPresets.ROLE_PLAY -> t("角色扮演", "Role Play")
         ReadingPresets.ENGLISH_PRACTICE -> t("英语跟读", "English Practice")
         else -> id
+    }
+
+@Composable
+private fun textOptimizationFeedbackLabel(feedback: TextOptimizationFeedback): String =
+    when (feedback) {
+        TextOptimizationFeedback.CleanedWhitespace -> t("已清理空白", "Whitespace cleaned")
+        TextOptimizationFeedback.AddedReadingBreaks -> t("已添加朗读分段", "Reading breaks added")
+        TextOptimizationFeedback.AddedMixedLanguageSpacing -> t("已整理中英间隔", "CJK/English spacing updated")
+        TextOptimizationFeedback.Polished -> t("已一键优化朗读文本", "Text polished for reading")
+        TextOptimizationFeedback.NoChange -> t("文本已经适合朗读，无需调整", "Text already looks ready for reading")
     }
 
 private fun HomeUiState.matchesPreset(preset: ReadingPreset): Boolean =
