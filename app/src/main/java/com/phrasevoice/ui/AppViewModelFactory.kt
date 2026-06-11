@@ -3,6 +3,7 @@ package com.phrasevoice.ui
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import com.phrasevoice.di.AppContainer
+import com.phrasevoice.ui.audio.AudioClipsViewModel
 import com.phrasevoice.ui.history.HistoryViewModel
 import com.phrasevoice.ui.home.HomeViewModel
 import com.phrasevoice.ui.library.PhraseLibraryViewModel
@@ -28,6 +29,12 @@ class AppViewModelFactory(
 
             modelClass.isAssignableFrom(PhraseLibraryViewModel::class.java) -> PhraseLibraryViewModel(
                 phraseRepository = container.phraseRepository,
+            )
+
+            modelClass.isAssignableFrom(AudioClipsViewModel::class.java) -> AudioClipsViewModel(
+                audioClipRepository = container.audioClipRepository,
+                audioFileStore = container.audioFileStore,
+                audioPlaybackController = container.audioPlaybackController,
             )
 
             modelClass.isAssignableFrom(HistoryViewModel::class.java) -> HistoryViewModel(

@@ -24,6 +24,7 @@ object PhraseVoicePreferenceKeys {
     val HISTORY = stringPreferencesKey("history_json")
     val USER_SETTINGS = stringPreferencesKey("user_settings_json")
     val PROVIDER_CONFIGS = stringPreferencesKey("provider_configs_json")
+    val AUDIO_CLIPS = stringPreferencesKey("audio_clips_json")
 }
 
 object PhraseVoiceJson {

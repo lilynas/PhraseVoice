@@ -1,7 +1,11 @@
 package com.phrasevoice.ui.communicate
 
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -28,11 +32,15 @@ import androidx.compose.material.icons.outlined.PlayArrow
 import androidx.compose.material.icons.outlined.QrCode2
 import androidx.compose.material.icons.outlined.Replay
 import androidx.compose.material.icons.outlined.Stop
+import androidx.compose.material.icons.outlined.Audiotrack
+import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.FileUpload
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -50,6 +58,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.phrasevoice.data.model.AudioClip
 import com.phrasevoice.data.model.Phrase
 import com.phrasevoice.data.repository.ProviderConfigRepository
 import com.phrasevoice.ui.home.HomeStatus
@@ -57,6 +66,7 @@ import com.phrasevoice.ui.home.HomeUiState
 import com.phrasevoice.ui.home.QUICK_PHRASE_FAVORITES_FILTER_ID
 import com.phrasevoice.ui.home.TtsProviderOption
 import com.phrasevoice.ui.home.VoiceWaveIndicator
+import com.phrasevoice.ui.audio.AudioClipsUiState
 import com.phrasevoice.ui.i18n.localizedHomeErrorMessage
 import com.phrasevoice.ui.i18n.localizedPhraseGroupName
 import com.phrasevoice.ui.i18n.localizedPhraseTitle
@@ -75,9 +85,13 @@ data class ContactCardUiState(
 fun CommunicateScreen(
     state: HomeUiState,
     contactCard: ContactCardUiState,
+    audioClipsState: AudioClipsUiState,
     onTextChange: (String) -> Unit,
     onQuickPhraseClick: (Phrase) -> Unit,
     onQuickPhraseGroupSelected: (String?) -> Unit,
+    onAudioClipImport: (Uri) -> Unit,
+    onAudioClipClick: (AudioClip) -> Unit,
+    onAudioClipDelete: (String) -> Unit,
     onSpeak: () -> Unit,
     onStop: () -> Unit,
     onReplay: () -> Unit,
@@ -92,6 +106,11 @@ fun CommunicateScreen(
         selectedProvider?.enabled == true
     val hasText = state.text.isNotBlank()
     var showContactCard by remember { mutableStateOf(false) }
+    val audioImportLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument(),
+    ) { uri: Uri? ->
+        if (uri != null) onAudioClipImport(uri)
+    }
 
     if (showContactCard) {
         ContactCardDialog(
@@ -155,6 +174,13 @@ fun CommunicateScreen(
                         onQuickPhraseClick = onQuickPhraseClick,
                         onQuickPhraseGroupSelected = onQuickPhraseGroupSelected,
                     )
+                    AudioClipsPanel(
+                        state = audioClipsState,
+                        compactCards = true,
+                        onImportClick = { audioImportLauncher.launch(arrayOf("audio/*")) },
+                        onAudioClipClick = onAudioClipClick,
+                        onAudioClipDelete = onAudioClipDelete,
+                    )
                 }
             }
         } else {
@@ -194,6 +220,13 @@ fun CommunicateScreen(
                     compactCards = false,
                     onQuickPhraseClick = onQuickPhraseClick,
                     onQuickPhraseGroupSelected = onQuickPhraseGroupSelected,
+                )
+                AudioClipsPanel(
+                    state = audioClipsState,
+                    compactCards = false,
+                    onImportClick = { audioImportLauncher.launch(arrayOf("audio/*")) },
+                    onAudioClipClick = onAudioClipClick,
+                    onAudioClipDelete = onAudioClipDelete,
                 )
             }
         }
@@ -603,6 +636,146 @@ private fun QuickPhrasePanel(
                         }
                     }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+@OptIn(ExperimentalLayoutApi::class)
+private fun AudioClipsPanel(
+    state: AudioClipsUiState,
+    compactCards: Boolean,
+    onImportClick: () -> Unit,
+    onAudioClipClick: (AudioClip) -> Unit,
+    onAudioClipDelete: (String) -> Unit,
+) {
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column {
+                Text(
+                    text = t("快捷音频", "Audio Clips"),
+                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.86f),
+                )
+                state.message?.takeIf { it.isNotBlank() }?.let { message ->
+                    Text(
+                        text = message,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+            OutlinedButton(
+                onClick = onImportClick,
+                enabled = !state.isImporting,
+                shape = RoundedCornerShape(14.dp),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.FileUpload,
+                    contentDescription = null,
+                    modifier = Modifier.padding(end = 6.dp),
+                )
+                Text(
+                    text = if (state.isImporting) t("导入中", "Importing") else t("导入", "Import"),
+                    fontWeight = FontWeight.SemiBold,
+                )
+            }
+        }
+
+        if (state.clips.isEmpty()) {
+            Surface(
+                color = MaterialTheme.colorScheme.surfaceVariant,
+                contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                shape = RoundedCornerShape(16.dp),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)),
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text(
+                    text = t("导入常用音效或语音文件后，会显示在这里。", "Imported sound effects and voice files will appear here."),
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.padding(14.dp),
+                )
+            }
+        } else {
+            FlowRow(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                state.clips.forEach { clip ->
+                    AudioClipButton(
+                        clip = clip,
+                        onClick = { onAudioClipClick(clip) },
+                        onDelete = { onAudioClipDelete(clip.id) },
+                        modifier = if (compactCards) {
+                            Modifier.widthIn(min = 152.dp, max = 240.dp)
+                        } else {
+                            Modifier.fillMaxWidth()
+                        },
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun AudioClipButton(
+    clip: AudioClip,
+    onClick: () -> Unit,
+    onDelete: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Surface(
+        shape = RoundedCornerShape(16.dp),
+        color = MaterialTheme.colorScheme.surface,
+        contentColor = MaterialTheme.colorScheme.onSurface,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+        modifier = modifier
+            .heightIn(min = 64.dp)
+            .clickable(onClick = onClick),
+    ) {
+        Row(
+            modifier = Modifier.padding(start = 12.dp, top = 8.dp, bottom = 8.dp, end = 4.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                imageVector = Icons.Outlined.Audiotrack,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+            )
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = clip.title,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+                Text(
+                    text = clip.mimeType.substringAfter('/').uppercase(),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            IconButton(onClick = onDelete) {
+                Icon(
+                    imageVector = Icons.Outlined.Delete,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
         }
     }

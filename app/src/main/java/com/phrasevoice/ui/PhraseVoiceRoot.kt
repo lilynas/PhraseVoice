@@ -57,6 +57,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.phrasevoice.ui.theme.PhraseVoiceTheme
 import com.phrasevoice.di.AppContainer
 import com.phrasevoice.system.QuickReturnNotifier
+import com.phrasevoice.ui.audio.AudioClipsViewModel
 import com.phrasevoice.ui.communicate.CommunicateScreen
 import com.phrasevoice.ui.communicate.ContactCardUiState
 import com.phrasevoice.ui.history.HistoryScreen
@@ -108,11 +109,13 @@ fun PhraseVoiceRoot(
     val historyViewModel: HistoryViewModel = viewModel(factory = factory)
     val settingsViewModel: SettingsViewModel = viewModel(factory = factory)
     val providerSettingsViewModel: ProviderSettingsViewModel = viewModel(factory = factory)
+    val audioClipsViewModel: AudioClipsViewModel = viewModel(factory = factory)
 
     var destination by rememberSaveable { mutableStateOf(Destination.Communicate) }
 
     val context = LocalContext.current
     val homeState by homeViewModel.uiState.collectAsStateWithLifecycle()
+    val audioClipsState by audioClipsViewModel.uiState.collectAsStateWithLifecycle()
     val settingsState by settingsViewModel.uiState.collectAsStateWithLifecycle()
     val isSystemDark = isSystemInDarkTheme()
     val isDarkTheme = when (settingsState.settings.themeMode) {
@@ -187,12 +190,19 @@ fun PhraseVoiceRoot(
                                 account = settingsState.settings.contactCardAccount,
                                 qrContent = settingsState.settings.contactCardQrContent,
                             ),
+                            audioClipsState = audioClipsState,
                             onTextChange = homeViewModel::updateText,
                             onQuickPhraseClick = { phrase ->
                                 homeViewModel.stop()
                                 homeViewModel.speakPhrase(phrase.id, phrase.text)
                             },
                             onQuickPhraseGroupSelected = homeViewModel::selectQuickPhraseGroup,
+                            onAudioClipImport = audioClipsViewModel::importClip,
+                            onAudioClipClick = { clip ->
+                                homeViewModel.stop()
+                                audioClipsViewModel.playClip(clip)
+                            },
+                            onAudioClipDelete = audioClipsViewModel::deleteClip,
                             onSpeak = homeViewModel::speak,
                             onStop = homeViewModel::stop,
                             onReplay = {
