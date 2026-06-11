@@ -169,6 +169,7 @@ fun PhraseVoiceRoot(container: AppContainer) {
                             onQuickPhraseClick = { phrase ->
                                 homeViewModel.speakPhrase(phrase.id, phrase.text)
                             },
+                            onQuickPhraseGroupSelected = homeViewModel::selectQuickPhraseGroup,
                             modifier = modifier,
                         )
 

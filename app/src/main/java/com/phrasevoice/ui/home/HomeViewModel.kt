@@ -8,6 +8,7 @@ import com.phrasevoice.data.model.MimoSettings
 import com.phrasevoice.data.model.MimoVoiceDesignPreset
 import com.phrasevoice.data.model.ProviderConfig
 import com.phrasevoice.data.model.Phrase
+import com.phrasevoice.data.model.PhraseGroup
 import com.phrasevoice.data.repository.HistoryRepository
 import com.phrasevoice.data.repository.PhraseRepository
 import com.phrasevoice.data.repository.ProviderConfigRepository
@@ -54,6 +55,8 @@ enum class TextOptimizationFeedback {
     NoChange,
 }
 
+internal const val QUICK_PHRASE_FAVORITES_FILTER_ID = "__favorites__"
+
 data class TtsProviderOption(
     val id: String,
     val name: String,
@@ -76,6 +79,8 @@ data class HomeUiState(
     val status: HomeStatus = HomeStatus.Idle,
     val errorMessage: String? = null,
     val quickPhrases: List<Phrase> = emptyList(),
+    val quickPhraseGroups: List<PhraseGroup> = emptyList(),
+    val selectedQuickPhraseGroupId: String? = null,
     val lastAudioUri: String? = null,
     val lastAudioMimeType: String? = null,
     val androidTtsReady: Boolean = true,
@@ -99,6 +104,8 @@ class HomeViewModel(
     val uiState: StateFlow<HomeUiState> = _uiState
     private var providerConfigs: List<ProviderConfig> = ProviderConfigRepository.defaultConfigs()
     private var androidVoices: List<TtsVoice> = emptyList()
+    private var phraseGroups: List<PhraseGroup> = emptyList()
+    private var libraryPhrases: List<Phrase> = emptyList()
 
     init {
         viewModelScope.launch {
@@ -198,15 +205,21 @@ class HomeViewModel(
             }
         }
         viewModelScope.launch {
-            phraseRepository.phrases.collect { phrases ->
-                val quick = phrases
-                    .sortedWith(
-                        compareByDescending<Phrase> { it.isFavorite }
-                            .thenByDescending { it.lastUsedAt ?: 0L }
-                            .thenBy { it.sortOrder },
+            phraseRepository.library.collect { library ->
+                phraseGroups = library.groups
+                libraryPhrases = library.phrases
+                _uiState.update { state ->
+                    val selectedGroupId = state.selectedQuickPhraseGroupId
+                        ?.takeIf { groupId ->
+                            groupId == QUICK_PHRASE_FAVORITES_FILTER_ID ||
+                                library.groups.any { it.id == groupId }
+                        }
+                    state.copy(
+                        quickPhraseGroups = library.groups,
+                        selectedQuickPhraseGroupId = selectedGroupId,
+                        quickPhrases = library.phrases.quickPhrasesFor(selectedGroupId),
                     )
-                    .take(12)
-                _uiState.update { it.copy(quickPhrases = quick) }
+                }
             }
         }
     }
@@ -220,6 +233,20 @@ class HomeViewModel(
                 lastAudioUri = null,
                 lastAudioMimeType = null,
                 textOptimizationFeedback = null,
+            )
+        }
+    }
+
+    fun selectQuickPhraseGroup(groupId: String?) {
+        _uiState.update {
+            val selectedGroupId = groupId
+                ?.takeIf { id ->
+                    id == QUICK_PHRASE_FAVORITES_FILTER_ID ||
+                        phraseGroups.any { group -> group.id == id }
+                }
+            it.copy(
+                selectedQuickPhraseGroupId = selectedGroupId,
+                quickPhrases = libraryPhrases.quickPhrasesFor(selectedGroupId),
             )
         }
     }
@@ -400,7 +427,12 @@ class HomeViewModel(
         }
 
         viewModelScope.launch {
-            _uiState.update { it.copy(status = HomeStatus.Loading, errorMessage = null) }
+            _uiState.update {
+                it.copy(
+                    status = HomeStatus.Loading,
+                    errorMessage = null,
+                )
+            }
             val request = currentRequest(text = trimmed, outputFormat = outputFormatForSelectedProvider())
             AppLogger.i(
                 TAG,
@@ -603,6 +635,22 @@ class HomeViewModel(
             TextOptimizationAction.MixedLanguageSpacing -> TextOptimizationFeedback.AddedMixedLanguageSpacing
             TextOptimizationAction.OneTapPolish -> TextOptimizationFeedback.Polished
         }
+
+    private fun List<Phrase>.quickPhrasesFor(groupId: String?): List<Phrase> {
+        val filtered = when (groupId) {
+            QUICK_PHRASE_FAVORITES_FILTER_ID -> filter { it.isFavorite }
+            null -> this
+            else -> filter { it.groupId == groupId }
+        }
+        val limit = if (groupId == null) 12 else 24
+        return filtered
+            .sortedWith(
+                compareByDescending<Phrase> { it.isFavorite }
+                    .thenByDescending { it.lastUsedAt ?: 0L }
+                    .thenBy { it.sortOrder },
+            )
+            .take(limit)
+    }
 
     private fun ProviderConfig.toProviderOption(
         androidTtsReady: Boolean = true,

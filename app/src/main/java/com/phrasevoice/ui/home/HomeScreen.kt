@@ -15,16 +15,21 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
@@ -71,6 +76,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.phrasevoice.data.model.Phrase
@@ -79,6 +85,7 @@ import com.phrasevoice.domain.tts.ReadingPreset
 import com.phrasevoice.domain.tts.ReadingPresets
 import com.phrasevoice.ui.i18n.localizedEdgeStyleName
 import com.phrasevoice.ui.i18n.localizedHomeErrorMessage
+import com.phrasevoice.ui.i18n.localizedPhraseGroupName
 import com.phrasevoice.ui.i18n.localizedPhraseTitle
 import com.phrasevoice.ui.i18n.localizedProviderHealthDescription
 import com.phrasevoice.ui.i18n.localizedProviderHealthLabel
@@ -125,7 +132,7 @@ fun VoiceWaveIndicator(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun HomeScreen(
     state: HomeUiState,
@@ -144,6 +151,7 @@ fun HomeScreen(
     onStop: () -> Unit,
     onSaveAudio: () -> Unit,
     onQuickPhraseClick: (Phrase) -> Unit,
+    onQuickPhraseGroupSelected: (String?) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
@@ -156,14 +164,8 @@ fun HomeScreen(
             selectedProvider?.enabled == true
     val shareTitle = t("分享音频", "Share Audio")
 
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
-    ) {
-        // App Title Section (No Slogan)
+    @Composable
+    fun HeaderSection() {
         Row(
             modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -177,25 +179,224 @@ fun HomeScreen(
                 )
             }
         }
+    }
 
-        // 1. Text input textfield (Double height)
-        OutlinedTextField(
-            value = state.text,
-            onValueChange = onTextChange,
-            label = { Text(t("朗读文本", "Text to Read")) },
-            placeholder = { Text(t("请输入要朗读的文本...", "Enter text to read..."), color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)) },
-            minLines = 8,
-            maxLines = 16,
-            shape = RoundedCornerShape(20.dp),
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = MaterialTheme.colorScheme.primary,
-                unfocusedBorderColor = MaterialTheme.colorScheme.outline,
-                focusedContainerColor = MaterialTheme.colorScheme.surface,
-                unfocusedContainerColor = MaterialTheme.colorScheme.surface,
-            ),
-            modifier = Modifier.fillMaxWidth().heightIn(min = 180.dp),
-        )
+    @Composable
+    fun ReadingTextPanel(expanded: Boolean, modifier: Modifier = Modifier) {
+        Column(
+            modifier = modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = t("朗读文本", "Text to Read"),
+                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.85f),
+                )
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    if (state.status == HomeStatus.Playing) {
+                        VoiceWaveIndicator(color = MaterialTheme.colorScheme.primary)
+                    }
+                    Text(
+                        text = when (state.status) {
+                            HomeStatus.Loading -> t("准备中", "Preparing")
+                            HomeStatus.Playing -> t("正在朗读", "Speaking")
+                            else -> t("待朗读", "Ready")
+                        },
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
 
+            OutlinedTextField(
+                value = state.text,
+                onValueChange = onTextChange,
+                placeholder = {
+                    Text(
+                        t("点击短语或输入文字开始朗读", "Tap a phrase or enter text to read"),
+                        color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.55f),
+                    )
+                },
+                minLines = if (expanded) 4 else 5,
+                maxLines = if (expanded) 8 else 10,
+                shape = RoundedCornerShape(24.dp),
+                textStyle = MaterialTheme.typography.headlineSmall.copy(
+                    fontWeight = FontWeight.Bold,
+                    textAlign = TextAlign.Start,
+                ),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = MaterialTheme.colorScheme.primary,
+                    unfocusedBorderColor = MaterialTheme.colorScheme.outline,
+                    focusedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                    unfocusedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                    focusedTextColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                    unfocusedTextColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                ),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = if (expanded) 170.dp else 190.dp),
+            )
+        }
+    }
+
+    @Composable
+    fun QuickPhrasesSection(
+        compactCards: Boolean,
+        modifier: Modifier = Modifier,
+    ) {
+        @Composable
+        fun QuickPhraseButton(
+            phrase: Phrase,
+            modifier: Modifier = Modifier,
+        ) {
+            OutlinedButton(
+                onClick = { onQuickPhraseClick(phrase) },
+                shape = RoundedCornerShape(16.dp),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 9.dp),
+                modifier = modifier.heightIn(min = 66.dp),
+            ) {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(2.dp),
+                    horizontalAlignment = Alignment.Start,
+                ) {
+                    Text(
+                        text = localizedPhraseTitle(phrase),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                    Text(
+                        text = phrase.text,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                }
+            }
+        }
+
+        Column(
+            modifier = modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = t("快捷短语", "Quick Phrases"),
+                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.85f),
+                )
+                Text(
+                    text = t("${state.quickPhrases.size} 条", "${state.quickPhrases.size} shown"),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+
+            LazyRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                item("all") {
+                    FilterChip(
+                        selected = state.selectedQuickPhraseGroupId == null,
+                        onClick = { onQuickPhraseGroupSelected(null) },
+                        label = { Text(t("全部", "All")) },
+                        shape = RoundedCornerShape(12.dp),
+                    )
+                }
+                item(QUICK_PHRASE_FAVORITES_FILTER_ID) {
+                    FilterChip(
+                        selected = state.selectedQuickPhraseGroupId == QUICK_PHRASE_FAVORITES_FILTER_ID,
+                        onClick = { onQuickPhraseGroupSelected(QUICK_PHRASE_FAVORITES_FILTER_ID) },
+                        label = { Text(t("收藏", "Favorites")) },
+                        shape = RoundedCornerShape(12.dp),
+                    )
+                }
+                items(state.quickPhraseGroups, key = { it.id }) { group ->
+                    FilterChip(
+                        selected = state.selectedQuickPhraseGroupId == group.id,
+                        onClick = { onQuickPhraseGroupSelected(group.id) },
+                        label = {
+                            Text(
+                                text = localizedPhraseGroupName(group),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        },
+                        shape = RoundedCornerShape(12.dp),
+                    )
+                }
+            }
+
+            if (state.quickPhrases.isEmpty()) {
+                Card(
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                    ),
+                    shape = RoundedCornerShape(16.dp),
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text(
+                        text = t("这个分组还没有短语", "No phrases in this group yet"),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(14.dp),
+                    )
+                }
+            } else {
+                FlowRow(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    if (compactCards) {
+                        state.quickPhrases.forEach { phrase ->
+                            QuickPhraseButton(
+                                phrase = phrase,
+                                modifier = Modifier.widthIn(min = 136.dp, max = 220.dp),
+                            )
+                        }
+                    } else {
+                        state.quickPhrases.chunked(3).forEach { rowPhrases ->
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            ) {
+                                rowPhrases.forEach { phrase ->
+                                    QuickPhraseButton(
+                                        phrase = phrase,
+                                        modifier = Modifier.weight(1f),
+                                    )
+                                }
+                                repeat(3 - rowPhrases.size) {
+                                    Spacer(modifier = Modifier.weight(1f))
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    @Composable
+    fun ControlsSection() {
         TextOptimizationRow(
             enabled = state.text.isNotBlank(),
             feedback = state.textOptimizationFeedback,
@@ -209,8 +410,10 @@ fun HomeScreen(
                 onCheckedChange = onMimoSmartTextOptimizationChange,
             )
         }
+    }
 
-        // 2. Control Actions Card (开始朗读 / 保存)
+    @Composable
+    fun PrimaryActionsSection() {
         Card(
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
             border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
@@ -297,8 +500,10 @@ fun HomeScreen(
                 }
             }
         }
+    }
 
-        // Status Error Alerts
+    @Composable
+    fun StatusSection() {
         if (state.status == HomeStatus.Error ||
             !state.errorMessage.isNullOrBlank() ||
             androidTtsUnavailable ||
@@ -333,47 +538,18 @@ fun HomeScreen(
                 }
             }
         }
+    }
 
-        // 3. Quick Phrases Section (常用语)
-        if (state.quickPhrases.isNotEmpty()) {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(
-                    text = t("常用语快捷朗读", "Quick Phrases"),
-                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.8f)
-                )
-                LazyRow(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    items(state.quickPhrases, key = { it.id }) { phrase ->
-                        SuggestionChip(
-                            onClick = { onQuickPhraseClick(phrase) },
-                            label = {
-                                Text(
-                                    text = localizedPhraseTitle(phrase),
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                    fontWeight = FontWeight.Medium
-                                )
-                            },
-                            shape = RoundedCornerShape(12.dp),
-                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
-                            colors = SuggestionChipDefaults.suggestionChipColors(
-                                containerColor = MaterialTheme.colorScheme.surface
-                            )
-                        )
-                    }
-                }
-            }
-        }
-
+    @Composable
+    fun PresetsSection() {
         ReadingPresetRow(
             state = state,
             onReadingPresetSelected = onReadingPresetSelected,
         )
+    }
 
-        // 4. Engine Configuration Card (声音引擎配置)
+    @Composable
+    fun EngineSection() {
         Card(
             colors = CardDefaults.cardColors(
                 containerColor = MaterialTheme.colorScheme.surface
@@ -421,8 +597,10 @@ fun HomeScreen(
                 }
             }
         }
+    }
 
-        // 5. Sliders combined in a single card (语速、音调、音量)
+    @Composable
+    fun VoicePropertiesSection() {
         Card(
             colors = CardDefaults.cardColors(
                 containerColor = MaterialTheme.colorScheme.surface
@@ -467,6 +645,63 @@ fun HomeScreen(
             }
         }
     }
+
+    BoxWithConstraints(modifier = modifier.fillMaxSize()) {
+        val wideLayout = maxWidth >= 720.dp
+        if (wideLayout) {
+            Row(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(16.dp),
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
+                Column(
+                    modifier = Modifier
+                        .weight(0.95f)
+                        .fillMaxHeight()
+                        .verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                ) {
+                    HeaderSection()
+                    ReadingTextPanel(expanded = true)
+                    QuickPhrasesSection(compactCards = true)
+                }
+                Column(
+                    modifier = Modifier
+                        .weight(1.05f)
+                        .fillMaxHeight()
+                        .verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                ) {
+                    ControlsSection()
+                    PrimaryActionsSection()
+                    StatusSection()
+                    PresetsSection()
+                    EngineSection()
+                    VoicePropertiesSection()
+                }
+            }
+        } else {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState())
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
+                HeaderSection()
+                ReadingTextPanel(expanded = false)
+                QuickPhrasesSection(compactCards = false)
+                ControlsSection()
+                PrimaryActionsSection()
+                StatusSection()
+                PresetsSection()
+                EngineSection()
+                VoicePropertiesSection()
+            }
+        }
+    }
+
 }
 
 @Composable
