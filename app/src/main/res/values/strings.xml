@@ -1,4 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">PhraseVoice</string>
+    <string name="quick_return_notification_title">PhraseVoice 正在待命</string>
+    <string name="quick_return_notification_text">点按返回交流页</string>
+    <string name="active_speech_notification_title">PhraseVoice 正在朗读</string>
+    <string name="active_speech_notification_text">交流语音正在播放</string>
+    <string name="active_speech_notification_chip">朗读中</string>
+    <string name="quick_return_notification_channel_name">交流快捷入口</string>
+    <string name="quick_return_notification_channel_description">从通知栏或锁屏快速回到交流页。</string>
 </resources>

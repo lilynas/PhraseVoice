@@ -24,6 +24,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -39,6 +40,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.fadeIn
@@ -54,9 +56,11 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.phrasevoice.ui.theme.PhraseVoiceTheme
 import com.phrasevoice.di.AppContainer
+import com.phrasevoice.system.QuickReturnNotifier
 import com.phrasevoice.ui.communicate.CommunicateScreen
 import com.phrasevoice.ui.history.HistoryScreen
 import com.phrasevoice.ui.history.HistoryViewModel
+import com.phrasevoice.ui.home.HomeStatus
 import com.phrasevoice.ui.home.HomeScreen
 import com.phrasevoice.ui.home.HomeViewModel
 import com.phrasevoice.ui.i18n.LocalAppLanguage
@@ -93,7 +97,10 @@ private fun Destination.label(): String =
     }
 
 @Composable
-fun PhraseVoiceRoot(container: AppContainer) {
+fun PhraseVoiceRoot(
+    container: AppContainer,
+    communicationRequestKey: Int = 0,
+) {
     val factory = remember(container) { AppViewModelFactory(container) }
     val homeViewModel: HomeViewModel = viewModel(factory = factory)
     val libraryViewModel: PhraseLibraryViewModel = viewModel(factory = factory)
@@ -103,6 +110,8 @@ fun PhraseVoiceRoot(container: AppContainer) {
 
     var destination by rememberSaveable { mutableStateOf(Destination.Communicate) }
 
+    val context = LocalContext.current
+    val homeState by homeViewModel.uiState.collectAsStateWithLifecycle()
     val settingsState by settingsViewModel.uiState.collectAsStateWithLifecycle()
     val isSystemDark = isSystemInDarkTheme()
     val isDarkTheme = when (settingsState.settings.themeMode) {
@@ -111,6 +120,20 @@ fun PhraseVoiceRoot(container: AppContainer) {
         else -> isSystemDark
     }
     val appLanguage = resolveAppLanguage(settingsState.settings.languageMode)
+
+    LaunchedEffect(communicationRequestKey) {
+        if (communicationRequestKey > 0) {
+            destination = Destination.Communicate
+        }
+    }
+
+    LaunchedEffect(homeState.status, homeState.text) {
+        when (homeState.status) {
+            HomeStatus.Loading,
+            HomeStatus.Playing -> QuickReturnNotifier.showSpeaking(context, homeState.text)
+            else -> QuickReturnNotifier.show(context)
+        }
+    }
 
     PhraseVoiceTheme(darkTheme = isDarkTheme) {
         CompositionLocalProvider(LocalAppLanguage provides appLanguage) {
@@ -156,7 +179,7 @@ fun PhraseVoiceRoot(container: AppContainer) {
                     val modifier = Modifier.padding(innerPadding)
                     when (targetDest) {
                         Destination.Communicate -> CommunicateScreen(
-                            state = homeViewModel.uiState.collectAsStateWithLifecycle().value,
+                            state = homeState,
                             onTextChange = homeViewModel::updateText,
                             onQuickPhraseClick = { phrase ->
                                 homeViewModel.stop()
@@ -173,7 +196,7 @@ fun PhraseVoiceRoot(container: AppContainer) {
                         )
 
                         Destination.Home -> HomeScreen(
-                            state = homeViewModel.uiState.collectAsStateWithLifecycle().value,
+                            state = homeState,
                             onTextChange = homeViewModel::updateText,
                             onProviderSelected = homeViewModel::selectProvider,
                             onVoiceSelected = homeViewModel::selectVoice,
