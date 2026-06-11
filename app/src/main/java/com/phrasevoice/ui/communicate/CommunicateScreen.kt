@@ -1,7 +1,9 @@
 package com.phrasevoice.ui.communicate
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -23,8 +25,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.PlayArrow
+import androidx.compose.material.icons.outlined.QrCode2
 import androidx.compose.material.icons.outlined.Replay
 import androidx.compose.material.icons.outlined.Stop
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.FilterChip
@@ -36,6 +40,10 @@ import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -55,10 +63,18 @@ import com.phrasevoice.ui.i18n.localizedPhraseTitle
 import com.phrasevoice.ui.i18n.localizedProviderHealthDescription
 import com.phrasevoice.ui.i18n.t
 
+data class ContactCardUiState(
+    val name: String,
+    val subtitle: String,
+    val account: String,
+    val qrContent: String,
+)
+
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun CommunicateScreen(
     state: HomeUiState,
+    contactCard: ContactCardUiState,
     onTextChange: (String) -> Unit,
     onQuickPhraseClick: (Phrase) -> Unit,
     onQuickPhraseGroupSelected: (String?) -> Unit,
@@ -75,6 +91,14 @@ fun CommunicateScreen(
         !androidTtsUnavailable &&
         selectedProvider?.enabled == true
     val hasText = state.text.isNotBlank()
+    var showContactCard by remember { mutableStateOf(false) }
+
+    if (showContactCard) {
+        ContactCardDialog(
+            contactCard = contactCard,
+            onDismiss = { showContactCard = false },
+        )
+    }
 
     BoxWithConstraints(modifier = modifier.fillMaxSize()) {
         val wideLayout = maxWidth >= 760.dp
@@ -94,6 +118,7 @@ fun CommunicateScreen(
                     CommunicateHeader(
                         state = state,
                         providerName = selectedProvider?.name,
+                        onContactCardClick = { showContactCard = true },
                     )
                     TalkingTextField(
                         text = state.text,
@@ -143,6 +168,7 @@ fun CommunicateScreen(
                 CommunicateHeader(
                     state = state,
                     providerName = selectedProvider?.name,
+                    onContactCardClick = { showContactCard = true },
                 )
                 TalkingTextField(
                     text = state.text,
@@ -178,6 +204,7 @@ fun CommunicateScreen(
 private fun CommunicateHeader(
     state: HomeUiState,
     providerName: String?,
+    onContactCardClick: () -> Unit,
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -200,9 +227,23 @@ private fun CommunicateHeader(
         }
 
         Row(
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
+            OutlinedButton(
+                onClick = onContactCardClick,
+                shape = RoundedCornerShape(14.dp),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
+                modifier = Modifier.height(40.dp),
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.QrCode2,
+                    contentDescription = null,
+                    modifier = Modifier.padding(end = 6.dp),
+                )
+                Text(t("扩列", "Card"), fontWeight = FontWeight.SemiBold)
+            }
             if (state.status == HomeStatus.Playing) {
                 VoiceWaveIndicator(color = MaterialTheme.colorScheme.primary)
             }
@@ -219,6 +260,92 @@ private fun CommunicateHeader(
             )
         }
     }
+}
+
+@Composable
+private fun ContactCardDialog(
+    contactCard: ContactCardUiState,
+    onDismiss: () -> Unit,
+) {
+    val displayName = contactCard.name.ifBlank { t("PhraseVoice", "PhraseVoice") }
+    val subtitle = contactCard.subtitle.ifBlank { t("很高兴认识你", "Nice to meet you") }
+    val account = contactCard.account.ifBlank { t("未填写账号", "No account set") }
+    val qrContent = contactCard.qrContent
+        .ifBlank { contactCard.account }
+        .ifBlank { displayName }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        confirmButton = {
+            Button(onClick = onDismiss, shape = RoundedCornerShape(14.dp)) {
+                Text(t("收起", "Close"))
+            }
+        },
+        title = {
+            Text(
+                text = t("扩列名片", "Contact Card"),
+                style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+            )
+        },
+        text = {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(14.dp),
+            ) {
+                Surface(
+                    color = MaterialTheme.colorScheme.primaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                    shape = RoundedCornerShape(20.dp),
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Column(
+                        modifier = Modifier.padding(18.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        Text(
+                            text = displayName,
+                            style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.ExtraBold),
+                            textAlign = TextAlign.Center,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        Text(
+                            text = subtitle,
+                            style = MaterialTheme.typography.bodyLarge,
+                            textAlign = TextAlign.Center,
+                            maxLines = 3,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        Text(
+                            text = account,
+                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                            textAlign = TextAlign.Center,
+                            maxLines = 3,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                }
+
+                Surface(
+                    color = MaterialTheme.colorScheme.surface,
+                    contentColor = MaterialTheme.colorScheme.onSurface,
+                    shape = RoundedCornerShape(18.dp),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                ) {
+                    QrCodeImage(
+                        content = qrContent,
+                        modifier = Modifier
+                            .fillMaxWidth(0.72f)
+                            .aspectRatio(1f)
+                            .background(MaterialTheme.colorScheme.surface)
+                            .padding(12.dp),
+                    )
+                }
+            }
+        },
+    )
 }
 
 @Composable

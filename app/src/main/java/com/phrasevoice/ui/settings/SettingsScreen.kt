@@ -35,6 +35,7 @@ import androidx.compose.material.icons.outlined.DarkMode
 import androidx.compose.material.icons.outlined.DirectionsRun
 import androidx.compose.material.icons.outlined.DirectionsWalk
 import androidx.compose.material.icons.outlined.LightMode
+import androidx.compose.material.icons.outlined.QrCode2
 import androidx.compose.material.icons.outlined.Translate
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.material3.Card
@@ -94,6 +95,10 @@ fun SettingsScreen(
     onRefreshAudioCache: () -> Unit,
     onThemeModeChange: (String) -> Unit,
     onLanguageModeChange: (String) -> Unit,
+    onContactCardNameChange: (String) -> Unit,
+    onContactCardSubtitleChange: (String) -> Unit,
+    onContactCardAccountChange: (String) -> Unit,
+    onContactCardQrContentChange: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     LaunchedEffect(Unit) {
@@ -219,6 +224,17 @@ fun SettingsScreen(
             SwitchSetting(t("保留音频缓存", "Keep Audio Cache"), settings.keepAudioCache, onKeepAudioCacheChange)
         }
 
+        ContactCardSettingsCard(
+            name = settings.contactCardName,
+            subtitle = settings.contactCardSubtitle,
+            account = settings.contactCardAccount,
+            qrContent = settings.contactCardQrContent,
+            onNameChange = onContactCardNameChange,
+            onSubtitleChange = onContactCardSubtitleChange,
+            onAccountChange = onContactCardAccountChange,
+            onQrContentChange = onContactCardQrContentChange,
+        )
+
         AudioCacheCard(
             state = state,
             onClearAudioCache = onClearAudioCache,
@@ -259,6 +275,91 @@ fun SettingsScreen(
             onLevelChange = onDebugLogLevelChange,
         )
     }
+}
+
+@Composable
+private fun ContactCardSettingsCard(
+    name: String,
+    subtitle: String,
+    account: String,
+    qrContent: String,
+    onNameChange: (String) -> Unit,
+    onSubtitleChange: (String) -> Unit,
+    onAccountChange: (String) -> Unit,
+    onQrContentChange: (String) -> Unit,
+) {
+    SettingsCard {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = t("扩列名片", "Contact Card"),
+                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                color = MaterialTheme.colorScheme.primary,
+            )
+            Icon(
+                imageVector = Icons.Outlined.QrCode2,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+            )
+        }
+
+        ContactCardTextField(
+            value = name,
+            onValueChange = onNameChange,
+            label = t("展示名称", "Display Name"),
+            minLines = 1,
+            maxLines = 1,
+        )
+        ContactCardTextField(
+            value = subtitle,
+            onValueChange = onSubtitleChange,
+            label = t("副标题", "Subtitle"),
+            minLines = 1,
+            maxLines = 2,
+        )
+        ContactCardTextField(
+            value = account,
+            onValueChange = onAccountChange,
+            label = t("账号", "Account"),
+            minLines = 1,
+            maxLines = 2,
+        )
+        ContactCardTextField(
+            value = qrContent,
+            onValueChange = onQrContentChange,
+            label = t("二维码内容", "QR Content"),
+            minLines = 2,
+            maxLines = 4,
+        )
+    }
+}
+
+@Composable
+private fun ContactCardTextField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    label: String,
+    minLines: Int,
+    maxLines: Int,
+) {
+    OutlinedTextField(
+        value = value,
+        onValueChange = onValueChange,
+        label = { Text(label) },
+        minLines = minLines,
+        maxLines = maxLines,
+        shape = RoundedCornerShape(16.dp),
+        colors = OutlinedTextFieldDefaults.colors(
+            focusedBorderColor = MaterialTheme.colorScheme.primary,
+            unfocusedBorderColor = MaterialTheme.colorScheme.outline,
+            focusedContainerColor = MaterialTheme.colorScheme.surface,
+            unfocusedContainerColor = MaterialTheme.colorScheme.surface,
+        ),
+        modifier = Modifier.fillMaxWidth(),
+    )
 }
 
 @Composable

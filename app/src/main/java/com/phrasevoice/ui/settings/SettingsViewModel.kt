@@ -113,6 +113,22 @@ class SettingsViewModel(
         update { it.copy(languageMode = value) }
     }
 
+    fun updateContactCardName(value: String) {
+        update { it.copy(contactCardName = value) }
+    }
+
+    fun updateContactCardSubtitle(value: String) {
+        update { it.copy(contactCardSubtitle = value) }
+    }
+
+    fun updateContactCardAccount(value: String) {
+        update { it.copy(contactCardAccount = value) }
+    }
+
+    fun updateContactCardQrContent(value: String) {
+        update { it.copy(contactCardQrContent = value) }
+    }
+
     fun completeOnboarding() {
         update { it.copy(hasCompletedOnboarding = true) }
     }

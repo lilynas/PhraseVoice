@@ -58,6 +58,7 @@ import com.phrasevoice.ui.theme.PhraseVoiceTheme
 import com.phrasevoice.di.AppContainer
 import com.phrasevoice.system.QuickReturnNotifier
 import com.phrasevoice.ui.communicate.CommunicateScreen
+import com.phrasevoice.ui.communicate.ContactCardUiState
 import com.phrasevoice.ui.history.HistoryScreen
 import com.phrasevoice.ui.history.HistoryViewModel
 import com.phrasevoice.ui.home.HomeStatus
@@ -180,6 +181,12 @@ fun PhraseVoiceRoot(
                     when (targetDest) {
                         Destination.Communicate -> CommunicateScreen(
                             state = homeState,
+                            contactCard = ContactCardUiState(
+                                name = settingsState.settings.contactCardName,
+                                subtitle = settingsState.settings.contactCardSubtitle,
+                                account = settingsState.settings.contactCardAccount,
+                                qrContent = settingsState.settings.contactCardQrContent,
+                            ),
                             onTextChange = homeViewModel::updateText,
                             onQuickPhraseClick = { phrase ->
                                 homeViewModel.stop()
@@ -292,6 +299,10 @@ fun PhraseVoiceRoot(
                             onRefreshAudioCache = settingsViewModel::refreshAudioCacheInfo,
                             onThemeModeChange = settingsViewModel::updateThemeMode,
                             onLanguageModeChange = settingsViewModel::updateLanguageMode,
+                            onContactCardNameChange = settingsViewModel::updateContactCardName,
+                            onContactCardSubtitleChange = settingsViewModel::updateContactCardSubtitle,
+                            onContactCardAccountChange = settingsViewModel::updateContactCardAccount,
+                            onContactCardQrContentChange = settingsViewModel::updateContactCardQrContent,
                             modifier = modifier,
                         )
                     }
