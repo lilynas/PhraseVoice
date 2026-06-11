@@ -113,6 +113,15 @@ class SettingsViewModel(
         update { it.copy(languageMode = value) }
     }
 
+    fun updateCommunicationTextScale(value: Float) {
+        update { it.copy(communicationTextScale = value.coerceIn(0.85f, 1.35f)) }
+    }
+
+    fun updateCommunicationTextTone(value: String) {
+        val normalized = if (value in COMMUNICATION_TEXT_TONES) value else "mint"
+        update { it.copy(communicationTextTone = normalized) }
+    }
+
     fun updateContactCardName(value: String) {
         update { it.copy(contactCardName = value) }
     }
@@ -205,5 +214,6 @@ class SettingsViewModel(
 
     companion object {
         private const val TAG = "SettingsViewModel"
+        private val COMMUNICATION_TEXT_TONES = setOf("mint", "sky", "warm", "lavender")
     }
 }

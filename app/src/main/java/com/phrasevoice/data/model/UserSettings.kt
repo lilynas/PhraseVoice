@@ -12,6 +12,8 @@ data class UserSettings(
     val keepAudioCache: Boolean = true,
     val themeMode: String = "system",
     val languageMode: String = "system",
+    val communicationTextScale: Float = 1.0f,
+    val communicationTextTone: String = "mint",
     val contactCardName: String = "PhraseVoice",
     val contactCardSubtitle: String = "很高兴认识你",
     val contactCardAccount: String = "@phrasevoice",

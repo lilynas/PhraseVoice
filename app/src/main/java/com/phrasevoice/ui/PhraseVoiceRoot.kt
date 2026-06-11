@@ -58,6 +58,7 @@ import com.phrasevoice.ui.theme.PhraseVoiceTheme
 import com.phrasevoice.di.AppContainer
 import com.phrasevoice.system.QuickReturnNotifier
 import com.phrasevoice.ui.audio.AudioClipsViewModel
+import com.phrasevoice.ui.communicate.CommunicationDisplayUiState
 import com.phrasevoice.ui.communicate.CommunicateScreen
 import com.phrasevoice.ui.communicate.ContactCardUiState
 import com.phrasevoice.ui.history.HistoryScreen
@@ -190,6 +191,10 @@ fun PhraseVoiceRoot(
                                 account = settingsState.settings.contactCardAccount,
                                 qrContent = settingsState.settings.contactCardQrContent,
                             ),
+                            display = CommunicationDisplayUiState(
+                                textScale = settingsState.settings.communicationTextScale,
+                                textTone = settingsState.settings.communicationTextTone,
+                            ),
                             audioClipsState = audioClipsState,
                             onTextChange = homeViewModel::updateText,
                             onQuickPhraseClick = { phrase ->
@@ -309,6 +314,8 @@ fun PhraseVoiceRoot(
                             onRefreshAudioCache = settingsViewModel::refreshAudioCacheInfo,
                             onThemeModeChange = settingsViewModel::updateThemeMode,
                             onLanguageModeChange = settingsViewModel::updateLanguageMode,
+                            onCommunicationTextScaleChange = settingsViewModel::updateCommunicationTextScale,
+                            onCommunicationTextToneChange = settingsViewModel::updateCommunicationTextTone,
                             onContactCardNameChange = settingsViewModel::updateContactCardName,
                             onContactCardSubtitleChange = settingsViewModel::updateContactCardSubtitle,
                             onContactCardAccountChange = settingsViewModel::updateContactCardAccount,

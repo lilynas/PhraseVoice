@@ -54,10 +54,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.phrasevoice.data.model.AudioClip
 import com.phrasevoice.data.model.Phrase
 import com.phrasevoice.data.repository.ProviderConfigRepository
@@ -80,11 +83,17 @@ data class ContactCardUiState(
     val qrContent: String,
 )
 
+data class CommunicationDisplayUiState(
+    val textScale: Float = 1.0f,
+    val textTone: String = "mint",
+)
+
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun CommunicateScreen(
     state: HomeUiState,
     contactCard: ContactCardUiState,
+    display: CommunicationDisplayUiState,
     audioClipsState: AudioClipsUiState,
     onTextChange: (String) -> Unit,
     onQuickPhraseClick: (Phrase) -> Unit,
@@ -143,6 +152,7 @@ fun CommunicateScreen(
                         text = state.text,
                         onTextChange = onTextChange,
                         expanded = true,
+                        display = display,
                         modifier = Modifier.weight(1f),
                     )
                     CommunicateActionRow(
@@ -200,6 +210,7 @@ fun CommunicateScreen(
                     text = state.text,
                     onTextChange = onTextChange,
                     expanded = false,
+                    display = display,
                 )
                 CommunicateActionRow(
                     status = state.status,
@@ -386,36 +397,76 @@ private fun TalkingTextField(
     text: String,
     onTextChange: (String) -> Unit,
     expanded: Boolean,
+    display: CommunicationDisplayUiState,
     modifier: Modifier = Modifier,
 ) {
+    val textScale = display.textScale.coerceIn(0.85f, 1.35f)
+    val toneColors = communicationTextToneColors(display.textTone)
+    val baseTextStyle = MaterialTheme.typography.headlineMedium
+    val textStyle = baseTextStyle.copy(
+        fontSize = (baseTextStyle.fontSize.value * textScale).sp,
+        fontWeight = FontWeight.Bold,
+        textAlign = TextAlign.Start,
+    )
+
     OutlinedTextField(
         value = text,
         onValueChange = onTextChange,
         placeholder = {
             Text(
                 text = t("点按短语，或直接输入要说的话", "Tap a phrase or type what you want to say"),
-                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.58f),
+                color = toneColors.contentColor.copy(alpha = 0.58f),
             )
         },
         minLines = if (expanded) 9 else 5,
         maxLines = if (expanded) 16 else 9,
         shape = RoundedCornerShape(22.dp),
-        textStyle = MaterialTheme.typography.headlineMedium.copy(
-            fontWeight = FontWeight.Bold,
-            textAlign = TextAlign.Start,
-        ),
+        textStyle = textStyle,
         colors = OutlinedTextFieldDefaults.colors(
             focusedBorderColor = MaterialTheme.colorScheme.primary,
             unfocusedBorderColor = MaterialTheme.colorScheme.outline,
-            focusedContainerColor = MaterialTheme.colorScheme.primaryContainer,
-            unfocusedContainerColor = MaterialTheme.colorScheme.primaryContainer,
-            focusedTextColor = MaterialTheme.colorScheme.onPrimaryContainer,
-            unfocusedTextColor = MaterialTheme.colorScheme.onPrimaryContainer,
+            focusedContainerColor = toneColors.containerColor,
+            unfocusedContainerColor = toneColors.containerColor,
+            focusedTextColor = toneColors.contentColor,
+            unfocusedTextColor = toneColors.contentColor,
+            cursorColor = toneColors.contentColor,
         ),
         modifier = modifier
             .fillMaxWidth()
             .heightIn(min = if (expanded) 360.dp else 220.dp),
     )
+}
+
+private data class CommunicationTextToneColors(
+    val containerColor: Color,
+    val contentColor: Color,
+)
+
+@Composable
+private fun communicationTextToneColors(tone: String): CommunicationTextToneColors {
+    val isDark = MaterialTheme.colorScheme.background.luminance() < 0.35f
+    return when (tone) {
+        "sky" -> if (isDark) {
+            CommunicationTextToneColors(Color(0xFF0D3751), Color(0xFFDDF2FF))
+        } else {
+            CommunicationTextToneColors(Color(0xFFDCEEFF), Color(0xFF102F48))
+        }
+        "warm" -> if (isDark) {
+            CommunicationTextToneColors(Color(0xFF4B351C), Color(0xFFFFE6BF))
+        } else {
+            CommunicationTextToneColors(Color(0xFFF7E5C8), Color(0xFF4B3216))
+        }
+        "lavender" -> if (isDark) {
+            CommunicationTextToneColors(Color(0xFF33275D), Color(0xFFEDE6FF))
+        } else {
+            CommunicationTextToneColors(Color(0xFFE9E2FF), Color(0xFF2F245C))
+        }
+        else -> if (isDark) {
+            CommunicationTextToneColors(Color(0xFF064E3B), Color(0xFFD1FAE5))
+        } else {
+            CommunicationTextToneColors(Color(0xFFD2E8DD), Color(0xFF0A2B18))
+        }
+    }
 }
 
 @Composable

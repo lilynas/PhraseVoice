@@ -7,6 +7,8 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.border
@@ -63,6 +65,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -77,6 +80,7 @@ import com.phrasevoice.ui.i18n.t
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import kotlin.math.roundToInt
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -95,6 +99,8 @@ fun SettingsScreen(
     onRefreshAudioCache: () -> Unit,
     onThemeModeChange: (String) -> Unit,
     onLanguageModeChange: (String) -> Unit,
+    onCommunicationTextScaleChange: (Float) -> Unit,
+    onCommunicationTextToneChange: (String) -> Unit,
     onContactCardNameChange: (String) -> Unit,
     onContactCardSubtitleChange: (String) -> Unit,
     onContactCardAccountChange: (String) -> Unit,
@@ -166,6 +172,13 @@ fun SettingsScreen(
                 }
             }
         }
+
+        CommunicationDisplaySettingsCard(
+            textScale = settings.communicationTextScale,
+            textTone = settings.communicationTextTone,
+            onTextScaleChange = onCommunicationTextScaleChange,
+            onTextToneChange = onCommunicationTextToneChange,
+        )
 
         SettingsCard {
             Text(
@@ -274,6 +287,76 @@ fun SettingsScreen(
             onEnabledChange = onDebugLoggingEnabledChange,
             onLevelChange = onDebugLogLevelChange,
         )
+    }
+}
+
+private data class CommunicationToneOption(
+    val value: String,
+    val label: String,
+    val swatchColor: Color,
+)
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun CommunicationDisplaySettingsCard(
+    textScale: Float,
+    textTone: String,
+    onTextScaleChange: (Float) -> Unit,
+    onTextToneChange: (String) -> Unit,
+) {
+    val toneOptions = listOf(
+        CommunicationToneOption("mint", t("薄荷", "Mint"), Color(0xFFD2E8DD)),
+        CommunicationToneOption("sky", t("天空", "Sky"), Color(0xFFDCEEFF)),
+        CommunicationToneOption("warm", t("暖光", "Warm"), Color(0xFFF7E5C8)),
+        CommunicationToneOption("lavender", t("薰衣草", "Lavender"), Color(0xFFE9E2FF)),
+    )
+
+    SettingsCard {
+        Text(
+            text = t("交流显示", "Communication Display"),
+            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+            color = MaterialTheme.colorScheme.primary,
+        )
+        SliderSetting(
+            label = t("大字字号", "Large Text Size"),
+            value = textScale,
+            range = 0.85f..1.35f,
+            startIcon = Icons.Outlined.ArrowDownward,
+            endIcon = Icons.Outlined.ArrowUpward,
+            onChange = onTextScaleChange,
+            valueFormatter = { "${(it * 100).roundToInt()}%" },
+        )
+        Text(
+            text = t("输入区颜色", "Input Tone"),
+            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+            color = MaterialTheme.colorScheme.onSurface,
+        )
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            toneOptions.forEach { option ->
+                FilterChip(
+                    selected = textTone == option.value,
+                    onClick = { onTextToneChange(option.value) },
+                    label = { Text(option.label, maxLines = 1) },
+                    leadingIcon = {
+                        Box(
+                            modifier = Modifier
+                                .size(14.dp)
+                                .background(option.swatchColor, RoundedCornerShape(4.dp))
+                                .border(
+                                    BorderStroke(
+                                        1.dp,
+                                        MaterialTheme.colorScheme.outline.copy(alpha = 0.55f),
+                                    ),
+                                    RoundedCornerShape(4.dp),
+                                ),
+                        )
+                    },
+                )
+            }
+        }
     }
 }
 
@@ -497,6 +580,7 @@ private fun SliderSetting(
     startIcon: ImageVector,
     endIcon: ImageVector,
     onChange: (Float) -> Unit,
+    valueFormatter: (Float) -> String = { "%.2f".format(it) },
 ) {
     Column {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -507,7 +591,7 @@ private fun SliderSetting(
             )
             Spacer(modifier = Modifier.weight(1f))
             Text(
-                text = "%.2f".format(value),
+                text = valueFormatter(value),
                 style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
                 color = MaterialTheme.colorScheme.primary
             )
