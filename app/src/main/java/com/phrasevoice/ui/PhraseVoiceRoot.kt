@@ -6,11 +6,13 @@ import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.List
+import androidx.compose.material.icons.filled.RecordVoiceOver
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.outlined.Build
 import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.List
+import androidx.compose.material.icons.outlined.RecordVoiceOver
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.Icon
 import androidx.compose.material3.AlertDialog
@@ -52,6 +54,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.phrasevoice.ui.theme.PhraseVoiceTheme
 import com.phrasevoice.di.AppContainer
+import com.phrasevoice.ui.communicate.CommunicateScreen
 import com.phrasevoice.ui.history.HistoryScreen
 import com.phrasevoice.ui.history.HistoryViewModel
 import com.phrasevoice.ui.home.HomeScreen
@@ -70,6 +73,7 @@ private enum class Destination(
     val selectedIcon: ImageVector,
     val unselectedIcon: ImageVector,
 ) {
+    Communicate(Icons.Filled.RecordVoiceOver, Icons.Outlined.RecordVoiceOver),
     Home(Icons.Filled.Home, Icons.Outlined.Home),
     Library(Icons.Filled.List, Icons.Outlined.List),
     History(Icons.Filled.History, Icons.Outlined.History),
@@ -80,10 +84,11 @@ private enum class Destination(
 @Composable
 private fun Destination.label(): String =
     when (this) {
+        Destination.Communicate -> t("交流", "Talk")
         Destination.Home -> t("朗读", "Read")
         Destination.Library -> t("常用语", "Phrases")
         Destination.History -> t("历史", "History")
-        Destination.Providers -> "Provider"
+        Destination.Providers -> t("声音", "Voice")
         Destination.Settings -> t("设置", "Settings")
     }
 
@@ -96,7 +101,7 @@ fun PhraseVoiceRoot(container: AppContainer) {
     val settingsViewModel: SettingsViewModel = viewModel(factory = factory)
     val providerSettingsViewModel: ProviderSettingsViewModel = viewModel(factory = factory)
 
-    var destination by rememberSaveable { mutableStateOf(Destination.Home) }
+    var destination by rememberSaveable { mutableStateOf(Destination.Communicate) }
 
     val settingsState by settingsViewModel.uiState.collectAsStateWithLifecycle()
     val isSystemDark = isSystemInDarkTheme()
@@ -150,6 +155,23 @@ fun PhraseVoiceRoot(container: AppContainer) {
                 ) { targetDest ->
                     val modifier = Modifier.padding(innerPadding)
                     when (targetDest) {
+                        Destination.Communicate -> CommunicateScreen(
+                            state = homeViewModel.uiState.collectAsStateWithLifecycle().value,
+                            onTextChange = homeViewModel::updateText,
+                            onQuickPhraseClick = { phrase ->
+                                homeViewModel.stop()
+                                homeViewModel.speakPhrase(phrase.id, phrase.text)
+                            },
+                            onQuickPhraseGroupSelected = homeViewModel::selectQuickPhraseGroup,
+                            onSpeak = homeViewModel::speak,
+                            onStop = homeViewModel::stop,
+                            onReplay = {
+                                homeViewModel.stop()
+                                homeViewModel.speak()
+                            },
+                            modifier = modifier,
+                        )
+
                         Destination.Home -> HomeScreen(
                             state = homeViewModel.uiState.collectAsStateWithLifecycle().value,
                             onTextChange = homeViewModel::updateText,
