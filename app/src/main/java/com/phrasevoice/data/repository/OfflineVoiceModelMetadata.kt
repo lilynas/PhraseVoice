@@ -4,7 +4,7 @@ import com.phrasevoice.data.model.OfflineVoiceModel
 import java.util.Locale
 
 object OfflineVoiceModelMetadata {
-    private val supportedExtensions = setOf("onnx", "zip", "tar", "tgz", "tar.gz")
+    private val supportedExtensions = setOf("onnx", "zip", "tar", "tgz", "tar.gz", "tar.bz2")
 
     fun statusFor(displayName: String, sizeBytes: Long): String {
         if (sizeBytes <= 0L) return OfflineVoiceModel.STATUS_CORRUPT
@@ -39,6 +39,7 @@ object OfflineVoiceModelMetadata {
     fun extensionFor(displayName: String): String {
         val lower = displayName.lowercase(Locale.US)
         if (lower.endsWith(".tar.gz")) return "tar.gz"
+        if (lower.endsWith(".tar.bz2")) return "tar.bz2"
         return lower.substringAfterLast('.', missingDelimiterValue = "")
     }
 }

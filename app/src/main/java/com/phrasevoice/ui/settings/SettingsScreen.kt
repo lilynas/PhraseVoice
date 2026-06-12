@@ -90,6 +90,8 @@ import androidx.compose.ui.unit.dp
 import com.phrasevoice.BuildConfig
 import com.phrasevoice.data.model.DisplayCard
 import com.phrasevoice.data.model.OfflineVoiceModel
+import com.phrasevoice.data.repository.OfflineVoiceDownloadCatalog
+import com.phrasevoice.data.repository.OfflineVoiceDownloadItem
 import com.phrasevoice.debug.DebugLogEntry
 import com.phrasevoice.ui.i18n.AppLanguageMode
 import com.phrasevoice.ui.i18n.localizedProviderHealthLabel
@@ -343,6 +345,8 @@ fun SettingsScreen(
                         "application/octet-stream",
                         "application/zip",
                         "application/x-tar",
+                        "application/x-bzip2",
+                        "application/x-bzip-compressed-tar",
                         "*/*",
                     ),
                 )
@@ -509,6 +513,11 @@ private fun OfflineVoiceSettingsCard(
     onImportClick: () -> Unit,
     onDelete: (String) -> Unit,
 ) {
+    val uriHandler = LocalUriHandler.current
+    val openUri: (String) -> Unit = { url ->
+        runCatching { uriHandler.openUri(url) }
+    }
+
     SettingsCard {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -539,6 +548,13 @@ private fun OfflineVoiceSettingsCard(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
+
+        OfflineVoiceDownloadList(
+            items = OfflineVoiceDownloadCatalog.recommended,
+            onDownload = { openUri(it.downloadUrl) },
+            onOpenDocs = { openUri(it.docsUrl) },
+            onOpenCatalog = { openUri(OfflineVoiceDownloadCatalog.OFFICIAL_CATALOG_URL) },
+        )
 
         if (models.isEmpty()) {
             Surface(
@@ -572,6 +588,120 @@ private fun OfflineVoiceSettingsCard(
                 models.sortedByDescending { it.importedAt }.forEach { model ->
                     OfflineVoiceModelRow(model = model, onDelete = onDelete)
                 }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun OfflineVoiceDownloadList(
+    items: List<OfflineVoiceDownloadItem>,
+    onDownload: (OfflineVoiceDownloadItem) -> Unit,
+    onOpenDocs: (OfflineVoiceDownloadItem) -> Unit,
+    onOpenCatalog: () -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = t("模型下载", "Model Downloads"),
+                style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+            TextButton(onClick = onOpenCatalog) {
+                Icon(Icons.Outlined.Info, contentDescription = null, modifier = Modifier.padding(end = 4.dp))
+                Text(t("更多", "More"))
+            }
+        }
+        Text(
+            text = t(
+                "不内置模型。请在浏览器下载模型包，下载完成后回到这里导入。",
+                "Models are not bundled. Download a package in the browser, then come back here to import it.",
+            ),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            items.forEach { item ->
+                OfflineVoiceDownloadRow(
+                    item = item,
+                    onDownload = { onDownload(item) },
+                    onOpenDocs = { onOpenDocs(item) },
+                )
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun OfflineVoiceDownloadRow(
+    item: OfflineVoiceDownloadItem,
+    onDownload: () -> Unit,
+    onOpenDocs: () -> Unit,
+) {
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.Top,
+        ) {
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(2.dp),
+            ) {
+                Text(
+                    text = item.title,
+                    style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.SemiBold),
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    text = t(item.descriptionZh, item.descriptionEn),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            TextButton(onClick = onDownload) {
+                Icon(Icons.Outlined.FileDownload, contentDescription = null, modifier = Modifier.padding(end = 4.dp))
+                Text(t("下载", "Download"))
+            }
+        }
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            SuggestionChip(
+                onClick = {},
+                label = { Text(item.language) },
+                shape = RoundedCornerShape(12.dp),
+            )
+            SuggestionChip(
+                onClick = {},
+                label = { Text(item.engine) },
+                shape = RoundedCornerShape(12.dp),
+            )
+            SuggestionChip(
+                onClick = {},
+                label = { Text(t("${item.speakers} 声线", "${item.speakers} voices")) },
+                shape = RoundedCornerShape(12.dp),
+            )
+            SuggestionChip(
+                onClick = {},
+                label = { Text(item.sampleRate) },
+                shape = RoundedCornerShape(12.dp),
+            )
+            TextButton(onClick = onOpenDocs) {
+                Icon(Icons.Outlined.Info, contentDescription = null, modifier = Modifier.padding(end = 4.dp))
+                Text(t("说明", "Docs"))
             }
         }
     }

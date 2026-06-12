@@ -17,6 +17,10 @@ class OfflineVoiceModelMetadataTest {
         )
         assertEquals(
             OfflineVoiceModel.STATUS_AVAILABLE,
+            OfflineVoiceModelMetadata.statusFor("vits-piper-zh_CN-chaowen-medium.tar.bz2", 2048L),
+        )
+        assertEquals(
+            OfflineVoiceModel.STATUS_AVAILABLE,
             OfflineVoiceModelMetadata.statusFor("piper-voice.zip", 2048L),
         )
     }
@@ -39,5 +43,22 @@ class OfflineVoiceModelMetadataTest {
         assertEquals("en", OfflineVoiceModelMetadata.languageFor("kokoro-en-us.zip"))
         assertEquals("vits melo tts zh en", OfflineVoiceModelMetadata.voiceNameFor("vits-melo-tts-zh_en.onnx"))
         assertEquals("kokoro model", OfflineVoiceModelMetadata.voiceNameFor("kokoro-model.tar.gz"))
+        assertEquals(
+            "vits piper zh CN chaowen medium",
+            OfflineVoiceModelMetadata.voiceNameFor("vits-piper-zh_CN-chaowen-medium.tar.bz2"),
+        )
+    }
+
+    @Test
+    fun recommendedDownloadCatalog_usesImportablePackages() {
+        assertEquals(3, OfflineVoiceDownloadCatalog.recommended.size)
+        OfflineVoiceDownloadCatalog.recommended.forEach { item ->
+            assertEquals(true, item.downloadUrl.startsWith("https://"))
+            assertEquals(true, item.docsUrl.startsWith("https://"))
+            assertEquals(
+                OfflineVoiceModel.STATUS_AVAILABLE,
+                OfflineVoiceModelMetadata.statusFor(item.downloadUrl.substringAfterLast('/'), 1024L),
+            )
+        }
     }
 }
