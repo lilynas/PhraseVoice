@@ -103,6 +103,9 @@ private fun Destination.label(): String =
 fun PhraseVoiceRoot(
     container: AppContainer,
     communicationRequestKey: Int = 0,
+    notificationReplayRequestKey: Int = 0,
+    notificationReplayText: String = "",
+    notificationStopRequestKey: Int = 0,
 ) {
     val factory = remember(container) { AppViewModelFactory(container) }
     val homeViewModel: HomeViewModel = viewModel(factory = factory)
@@ -132,11 +135,30 @@ fun PhraseVoiceRoot(
         }
     }
 
+    LaunchedEffect(notificationReplayRequestKey) {
+        if (notificationReplayRequestKey > 0) {
+            val text = notificationReplayText.ifBlank { homeState.text }
+            if (text.isNotBlank()) {
+                destination = Destination.Communicate
+                homeViewModel.stop()
+                homeViewModel.updateText(text)
+                homeViewModel.speakText(text)
+            }
+        }
+    }
+
+    LaunchedEffect(notificationStopRequestKey) {
+        if (notificationStopRequestKey > 0) {
+            destination = Destination.Communicate
+            homeViewModel.stop()
+        }
+    }
+
     LaunchedEffect(homeState.status, homeState.text) {
         when (homeState.status) {
             HomeStatus.Loading,
             HomeStatus.Playing -> QuickReturnNotifier.showSpeaking(context, homeState.text)
-            else -> QuickReturnNotifier.show(context)
+            else -> QuickReturnNotifier.show(context, homeState.text)
         }
     }
 

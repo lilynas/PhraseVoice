@@ -16,6 +16,9 @@ import com.phrasevoice.ui.PhraseVoiceRoot
 
 class MainActivity : ComponentActivity() {
     private val communicationRequestKey = mutableStateOf(0)
+    private val notificationReplayRequestKey = mutableStateOf(0)
+    private val notificationReplayText = mutableStateOf("")
+    private val notificationStopRequestKey = mutableStateOf(0)
     private val notificationPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission(),
     ) { granted ->
@@ -34,6 +37,9 @@ class MainActivity : ComponentActivity() {
             PhraseVoiceRoot(
                 container = appContainer,
                 communicationRequestKey = communicationRequestKey.value,
+                notificationReplayRequestKey = notificationReplayRequestKey.value,
+                notificationReplayText = notificationReplayText.value,
+                notificationStopRequestKey = notificationStopRequestKey.value,
             )
         }
 
@@ -44,11 +50,6 @@ class MainActivity : ComponentActivity() {
         super.onNewIntent(intent)
         setIntent(intent)
         handleIntent(intent)
-        QuickReturnNotifier.show(this)
-    }
-
-    override fun onResume() {
-        super.onResume()
         QuickReturnNotifier.show(this)
     }
 
@@ -84,8 +85,19 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun handleIntent(intent: Intent?) {
-        if (QuickReturnNotifier.isOpenCommunicationIntent(intent)) {
-            communicationRequestKey.value += 1
+        when {
+            QuickReturnNotifier.isReplayIntent(intent) -> {
+                notificationReplayText.value = QuickReturnNotifier.replayText(intent)
+                notificationReplayRequestKey.value += 1
+                communicationRequestKey.value += 1
+            }
+            QuickReturnNotifier.isStopIntent(intent) -> {
+                notificationStopRequestKey.value += 1
+                communicationRequestKey.value += 1
+            }
+            QuickReturnNotifier.isOpenCommunicationIntent(intent) -> {
+                communicationRequestKey.value += 1
+            }
         }
     }
 }
