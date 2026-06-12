@@ -201,6 +201,13 @@ fun PhraseVoiceRoot(
                                 homeViewModel.stop()
                                 homeViewModel.speakPhrase(phrase.id, phrase.text)
                             },
+                            onQuickPhraseEdit = { phrase ->
+                                destination = Destination.Library
+                                libraryViewModel.openEditDialog(phrase)
+                            },
+                            onQuickPhraseFavoriteToggle = { phrase ->
+                                libraryViewModel.toggleFavorite(phrase.id)
+                            },
                             onQuickPhraseGroupSelected = homeViewModel::selectQuickPhraseGroup,
                             onAudioClipImport = audioClipsViewModel::importClip,
                             onAudioClipClick = { clip ->
@@ -219,6 +226,10 @@ fun PhraseVoiceRoot(
 
                         Destination.Home -> HomeScreen(
                             state = homeState,
+                            display = CommunicationDisplayUiState(
+                                textScale = settingsState.settings.communicationTextScale,
+                                textTone = settingsState.settings.communicationTextTone,
+                            ),
                             onTextChange = homeViewModel::updateText,
                             onProviderSelected = homeViewModel::selectProvider,
                             onVoiceSelected = homeViewModel::selectVoice,
@@ -235,6 +246,13 @@ fun PhraseVoiceRoot(
                             onSaveAudio = homeViewModel::saveAudio,
                             onQuickPhraseClick = { phrase ->
                                 homeViewModel.speakPhrase(phrase.id, phrase.text)
+                            },
+                            onQuickPhraseEdit = { phrase ->
+                                destination = Destination.Library
+                                libraryViewModel.openEditDialog(phrase)
+                            },
+                            onQuickPhraseFavoriteToggle = { phrase ->
+                                libraryViewModel.toggleFavorite(phrase.id)
                             },
                             onQuickPhraseGroupSelected = homeViewModel::selectQuickPhraseGroup,
                             modifier = modifier,

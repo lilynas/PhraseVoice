@@ -12,6 +12,8 @@ import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
@@ -43,6 +45,7 @@ import androidx.compose.material.icons.outlined.ArrowUpward
 import androidx.compose.material.icons.outlined.DirectionsRun
 import androidx.compose.material.icons.outlined.DirectionsWalk
 import androidx.compose.material.icons.outlined.Download
+import androidx.compose.material.icons.outlined.Fullscreen
 import androidx.compose.material.icons.outlined.PlayArrow
 import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material.icons.outlined.Stop
@@ -63,6 +66,7 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.SuggestionChip
 import androidx.compose.material3.SuggestionChipDefaults
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -83,6 +87,9 @@ import com.phrasevoice.data.model.Phrase
 import com.phrasevoice.domain.text.TextOptimizationAction
 import com.phrasevoice.domain.tts.ReadingPreset
 import com.phrasevoice.domain.tts.ReadingPresets
+import com.phrasevoice.ui.common.QuickPhraseActionDialog
+import com.phrasevoice.ui.communicate.CommunicationDisplayUiState
+import com.phrasevoice.ui.communicate.LargeTextDisplayDialog
 import com.phrasevoice.ui.i18n.localizedEdgeStyleName
 import com.phrasevoice.ui.i18n.localizedHomeErrorMessage
 import com.phrasevoice.ui.i18n.localizedPhraseGroupName
@@ -132,10 +139,11 @@ fun VoiceWaveIndicator(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class, ExperimentalFoundationApi::class)
 @Composable
 fun HomeScreen(
     state: HomeUiState,
+    display: CommunicationDisplayUiState,
     onTextChange: (String) -> Unit,
     onProviderSelected: (String) -> Unit,
     onVoiceSelected: (String?) -> Unit,
@@ -151,6 +159,8 @@ fun HomeScreen(
     onStop: () -> Unit,
     onSaveAudio: () -> Unit,
     onQuickPhraseClick: (Phrase) -> Unit,
+    onQuickPhraseEdit: (Phrase) -> Unit,
+    onQuickPhraseFavoriteToggle: (Phrase) -> Unit,
     onQuickPhraseGroupSelected: (String?) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -163,6 +173,32 @@ fun HomeScreen(
             !androidTtsUnavailable &&
             selectedProvider?.enabled == true
     val shareTitle = t("分享音频", "Share Audio")
+    var showLargeText by remember { mutableStateOf(false) }
+    var phraseAction by remember { mutableStateOf<Phrase?>(null) }
+
+    if (showLargeText) {
+        LargeTextDisplayDialog(
+            text = state.text,
+            display = display,
+            isPlaying = state.status == HomeStatus.Playing,
+            canSpeak = canRunTts && state.text.isNotBlank(),
+            onSpeak = onSpeak,
+            onStop = onStop,
+            onReplay = {
+                onStop()
+                onSpeak()
+            },
+            onDismiss = { showLargeText = false },
+        )
+    }
+    phraseAction?.let { phrase ->
+        QuickPhraseActionDialog(
+            phrase = phrase,
+            onDismiss = { phraseAction = null },
+            onEdit = onQuickPhraseEdit,
+            onToggleFavorite = onQuickPhraseFavoriteToggle,
+        )
+    }
 
     @Composable
     fun HeaderSection() {
@@ -213,6 +249,21 @@ fun HomeScreen(
                         style = MaterialTheme.typography.labelLarge,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
+                    OutlinedButton(
+                        onClick = { showLargeText = true },
+                        enabled = state.text.isNotBlank(),
+                        shape = RoundedCornerShape(12.dp),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                        contentPadding = PaddingValues(horizontal = 9.dp, vertical = 0.dp),
+                        modifier = Modifier.height(36.dp),
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.Fullscreen,
+                            contentDescription = null,
+                            modifier = Modifier.padding(end = 4.dp).size(18.dp),
+                        )
+                        Text(t("全屏", "Full"), fontWeight = FontWeight.SemiBold)
+                    }
                 }
             }
 
@@ -257,15 +308,22 @@ fun HomeScreen(
             phrase: Phrase,
             modifier: Modifier = Modifier,
         ) {
-            OutlinedButton(
-                onClick = { onQuickPhraseClick(phrase) },
+            Surface(
                 shape = RoundedCornerShape(16.dp),
+                color = MaterialTheme.colorScheme.surface,
+                contentColor = MaterialTheme.colorScheme.onSurface,
                 border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
-                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 9.dp),
-                modifier = modifier.heightIn(min = 66.dp),
+                modifier = modifier
+                    .heightIn(min = 66.dp)
+                    .combinedClickable(
+                        onClick = { onQuickPhraseClick(phrase) },
+                        onLongClick = { phraseAction = phrase },
+                    ),
             ) {
                 Column(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 10.dp, vertical = 9.dp),
                     verticalArrangement = Arrangement.spacedBy(2.dp),
                     horizontalAlignment = Alignment.Start,
                 ) {

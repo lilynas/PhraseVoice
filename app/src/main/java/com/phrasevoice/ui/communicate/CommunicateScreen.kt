@@ -6,6 +6,8 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -28,6 +30,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Fullscreen
 import androidx.compose.material.icons.outlined.PlayArrow
 import androidx.compose.material.icons.outlined.QrCode2
 import androidx.compose.material.icons.outlined.Replay
@@ -54,8 +57,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -64,6 +65,7 @@ import androidx.compose.ui.unit.sp
 import com.phrasevoice.data.model.AudioClip
 import com.phrasevoice.data.model.Phrase
 import com.phrasevoice.data.repository.ProviderConfigRepository
+import com.phrasevoice.ui.common.QuickPhraseActionDialog
 import com.phrasevoice.ui.home.HomeStatus
 import com.phrasevoice.ui.home.HomeUiState
 import com.phrasevoice.ui.home.QUICK_PHRASE_FAVORITES_FILTER_ID
@@ -97,6 +99,8 @@ fun CommunicateScreen(
     audioClipsState: AudioClipsUiState,
     onTextChange: (String) -> Unit,
     onQuickPhraseClick: (Phrase) -> Unit,
+    onQuickPhraseEdit: (Phrase) -> Unit,
+    onQuickPhraseFavoriteToggle: (Phrase) -> Unit,
     onQuickPhraseGroupSelected: (String?) -> Unit,
     onAudioClipImport: (Uri) -> Unit,
     onAudioClipClick: (AudioClip) -> Unit,
@@ -115,6 +119,8 @@ fun CommunicateScreen(
         selectedProvider?.enabled == true
     val hasText = state.text.isNotBlank()
     var showContactCard by remember { mutableStateOf(false) }
+    var showLargeText by remember { mutableStateOf(false) }
+    var phraseAction by remember { mutableStateOf<Phrase?>(null) }
     val audioImportLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument(),
     ) { uri: Uri? ->
@@ -125,6 +131,26 @@ fun CommunicateScreen(
         ContactCardDialog(
             contactCard = contactCard,
             onDismiss = { showContactCard = false },
+        )
+    }
+    if (showLargeText) {
+        LargeTextDisplayDialog(
+            text = state.text,
+            display = display,
+            isPlaying = state.status == HomeStatus.Playing,
+            canSpeak = canRunTts && hasText,
+            onSpeak = onSpeak,
+            onStop = onStop,
+            onReplay = onReplay,
+            onDismiss = { showLargeText = false },
+        )
+    }
+    phraseAction?.let { phrase ->
+        QuickPhraseActionDialog(
+            phrase = phrase,
+            onDismiss = { phraseAction = null },
+            onEdit = onQuickPhraseEdit,
+            onToggleFavorite = onQuickPhraseFavoriteToggle,
         )
     }
 
@@ -162,6 +188,7 @@ fun CommunicateScreen(
                         onSpeak = onSpeak,
                         onStop = onStop,
                         onReplay = onReplay,
+                        onShowLargeText = { showLargeText = true },
                     )
                     CommunicateStatusMessage(
                         state = state,
@@ -182,6 +209,7 @@ fun CommunicateScreen(
                         state = state,
                         compactCards = true,
                         onQuickPhraseClick = onQuickPhraseClick,
+                        onQuickPhraseLongClick = { phraseAction = it },
                         onQuickPhraseGroupSelected = onQuickPhraseGroupSelected,
                     )
                     AudioClipsPanel(
@@ -219,6 +247,7 @@ fun CommunicateScreen(
                     onSpeak = onSpeak,
                     onStop = onStop,
                     onReplay = onReplay,
+                    onShowLargeText = { showLargeText = true },
                 )
                 CommunicateStatusMessage(
                     state = state,
@@ -230,6 +259,7 @@ fun CommunicateScreen(
                     state = state,
                     compactCards = false,
                     onQuickPhraseClick = onQuickPhraseClick,
+                    onQuickPhraseLongClick = { phraseAction = it },
                     onQuickPhraseGroupSelected = onQuickPhraseGroupSelected,
                 )
                 AudioClipsPanel(
@@ -437,38 +467,6 @@ private fun TalkingTextField(
     )
 }
 
-private data class CommunicationTextToneColors(
-    val containerColor: Color,
-    val contentColor: Color,
-)
-
-@Composable
-private fun communicationTextToneColors(tone: String): CommunicationTextToneColors {
-    val isDark = MaterialTheme.colorScheme.background.luminance() < 0.35f
-    return when (tone) {
-        "sky" -> if (isDark) {
-            CommunicationTextToneColors(Color(0xFF0D3751), Color(0xFFDDF2FF))
-        } else {
-            CommunicationTextToneColors(Color(0xFFDCEEFF), Color(0xFF102F48))
-        }
-        "warm" -> if (isDark) {
-            CommunicationTextToneColors(Color(0xFF4B351C), Color(0xFFFFE6BF))
-        } else {
-            CommunicationTextToneColors(Color(0xFFF7E5C8), Color(0xFF4B3216))
-        }
-        "lavender" -> if (isDark) {
-            CommunicationTextToneColors(Color(0xFF33275D), Color(0xFFEDE6FF))
-        } else {
-            CommunicationTextToneColors(Color(0xFFE9E2FF), Color(0xFF2F245C))
-        }
-        else -> if (isDark) {
-            CommunicationTextToneColors(Color(0xFF064E3B), Color(0xFFD1FAE5))
-        } else {
-            CommunicationTextToneColors(Color(0xFFD2E8DD), Color(0xFF0A2B18))
-        }
-    }
-}
-
 @Composable
 private fun CommunicateActionRow(
     status: HomeStatus,
@@ -477,6 +475,7 @@ private fun CommunicateActionRow(
     onSpeak: () -> Unit,
     onStop: () -> Unit,
     onReplay: () -> Unit,
+    onShowLargeText: () -> Unit,
 ) {
     val isPlaying = status == HomeStatus.Playing
     Row(
@@ -533,6 +532,24 @@ private fun CommunicateActionRow(
             )
             Text(t("重播", "Replay"), fontWeight = FontWeight.SemiBold)
         }
+
+        OutlinedButton(
+            onClick = onShowLargeText,
+            enabled = hasText,
+            shape = RoundedCornerShape(16.dp),
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+            modifier = Modifier
+                .weight(0.82f)
+                .height(54.dp),
+            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
+        ) {
+            Icon(
+                imageVector = Icons.Outlined.Fullscreen,
+                contentDescription = null,
+                modifier = Modifier.padding(end = 6.dp),
+            )
+            Text(t("全屏", "Full"), fontWeight = FontWeight.SemiBold)
+        }
     }
 }
 
@@ -581,6 +598,7 @@ private fun QuickPhrasePanel(
     state: HomeUiState,
     compactCards: Boolean,
     onQuickPhraseClick: (Phrase) -> Unit,
+    onQuickPhraseLongClick: (Phrase) -> Unit,
     onQuickPhraseGroupSelected: (String?) -> Unit,
 ) {
     Column(
@@ -665,6 +683,7 @@ private fun QuickPhrasePanel(
                         QuickPhraseButton(
                             phrase = phrase,
                             onClick = { onQuickPhraseClick(phrase) },
+                            onLongClick = { onQuickPhraseLongClick(phrase) },
                             modifier = Modifier.widthIn(min = 152.dp, max = 230.dp),
                         )
                     }
@@ -678,6 +697,7 @@ private fun QuickPhrasePanel(
                                 QuickPhraseButton(
                                     phrase = phrase,
                                     onClick = { onQuickPhraseClick(phrase) },
+                                    onLongClick = { onQuickPhraseLongClick(phrase) },
                                     modifier = Modifier.weight(1f),
                                 )
                             }
@@ -832,21 +852,30 @@ private fun AudioClipButton(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun QuickPhraseButton(
     phrase: Phrase,
     onClick: () -> Unit,
+    onLongClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    OutlinedButton(
-        onClick = onClick,
+    Surface(
         shape = RoundedCornerShape(16.dp),
+        color = MaterialTheme.colorScheme.surface,
+        contentColor = MaterialTheme.colorScheme.onSurface,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
-        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 9.dp),
-        modifier = modifier.heightIn(min = 68.dp),
+        modifier = modifier
+            .heightIn(min = 68.dp)
+            .combinedClickable(
+                onClick = onClick,
+                onLongClick = onLongClick,
+            ),
     ) {
         Column(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 10.dp, vertical = 9.dp),
             verticalArrangement = Arrangement.spacedBy(2.dp),
             horizontalAlignment = Alignment.Start,
         ) {
