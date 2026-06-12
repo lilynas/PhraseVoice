@@ -1,10 +1,13 @@
 package com.phrasevoice.ui.settings
 
+import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.phrasevoice.data.local.AudioCacheInfo
 import com.phrasevoice.data.local.AudioFileStore
+import com.phrasevoice.data.local.OfflineVoiceModelStore
 import com.phrasevoice.data.model.DisplayCard
+import com.phrasevoice.data.model.OfflineVoiceModel
 import com.phrasevoice.data.model.ProviderConfig
 import com.phrasevoice.debug.AppLogger
 import com.phrasevoice.debug.DebugLogEntry
@@ -52,6 +55,7 @@ data class SettingsUiState(
     val debugLogs: List<DebugLogEntry> = emptyList(),
     val displayCardEditor: DisplayCardEditorState = DisplayCardEditorState(),
     val displayCardFileActionMessage: String? = null,
+    val offlineVoiceMessage: String? = null,
     val isLoaded: Boolean = false,
 )
 
@@ -59,11 +63,13 @@ class SettingsViewModel(
     private val settingsRepository: SettingsRepository,
     private val providerConfigRepository: ProviderConfigRepository,
     private val audioFileStore: AudioFileStore,
+    private val offlineVoiceModelStore: OfflineVoiceModelStore,
 ) : ViewModel() {
     private val audioCacheInfo = MutableStateFlow(audioFileStore.cacheInfo())
     private val cacheMessage = MutableStateFlow<String?>(null)
     private val displayCardEditor = MutableStateFlow(DisplayCardEditorState())
     private val displayCardFileActionMessage = MutableStateFlow<String?>(null)
+    private val offlineVoiceMessage = MutableStateFlow<String?>(null)
 
     init {
         viewModelScope.launch {
@@ -98,10 +104,12 @@ class SettingsViewModel(
         },
         displayCardEditor,
         displayCardFileActionMessage,
-    ) { state, editor, cardMessage ->
+        offlineVoiceMessage,
+    ) { state, editor, cardMessage, offlineMessage ->
         state.copy(
             displayCardEditor = editor,
             displayCardFileActionMessage = cardMessage,
+            offlineVoiceMessage = offlineMessage,
         )
     }
         .stateIn(
@@ -132,6 +140,10 @@ class SettingsViewModel(
 
     fun updateKeepAudioCache(value: Boolean) {
         update { it.copy(keepAudioCache = value) }
+    }
+
+    fun updateCloudFallbackToSystemTts(value: Boolean) {
+        update { it.copy(cloudFallbackToSystemTts = value) }
     }
 
     fun updateThemeMode(value: String) {
@@ -347,6 +359,53 @@ class SettingsViewModel(
 
     fun showDisplayCardFileActionMessage(message: String) {
         displayCardFileActionMessage.value = message
+    }
+
+    fun importOfflineVoiceModel(uri: Uri) {
+        viewModelScope.launch {
+            val result = runCatching {
+                withContext(Dispatchers.IO) {
+                    offlineVoiceModelStore.importModel(uri)
+                }
+            }
+
+            result
+                .onSuccess { model ->
+                    settingsRepository.updateSettings { settings ->
+                        settings.copy(
+                            offlineVoiceModels = (settings.offlineVoiceModels + model)
+                                .distinctBy { it.id }
+                                .sortedByDescending { it.importedAt },
+                        )
+                    }
+                    offlineVoiceMessage.value = when (model.status) {
+                        OfflineVoiceModel.STATUS_AVAILABLE -> "已导入离线语音模型。"
+                        OfflineVoiceModel.STATUS_CORRUPT -> "模型包为空，已标记为损坏。"
+                        OfflineVoiceModel.STATUS_INCOMPATIBLE -> "模型包类型暂不兼容，已保留记录。"
+                        else -> "已导入离线语音模型。"
+                    }
+                }
+                .onFailure { throwable ->
+                    offlineVoiceMessage.value = "导入失败：${throwable.message ?: "无法读取模型包"}"
+                }
+        }
+    }
+
+    fun deleteOfflineVoiceModel(modelId: String) {
+        viewModelScope.launch {
+            val model = uiState.value.settings.offlineVoiceModels.firstOrNull { it.id == modelId }
+            if (model != null) {
+                withContext(Dispatchers.IO) {
+                    offlineVoiceModelStore.deleteModel(model.fileName)
+                }
+            }
+            settingsRepository.updateSettings { settings ->
+                settings.copy(
+                    offlineVoiceModels = settings.offlineVoiceModels.filterNot { it.id == modelId },
+                )
+            }
+            offlineVoiceMessage.value = "已删除离线语音模型。"
+        }
     }
 
     fun completeOnboarding() {

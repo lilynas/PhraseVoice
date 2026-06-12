@@ -78,6 +78,7 @@ data class HomeUiState(
     val volume: Float = 1.0f,
     val status: HomeStatus = HomeStatus.Idle,
     val errorMessage: String? = null,
+    val noticeMessage: String? = null,
     val quickPhrases: List<Phrase> = emptyList(),
     val quickPhraseGroups: List<PhraseGroup> = emptyList(),
     val selectedQuickPhraseGroupId: String? = null,
@@ -88,6 +89,13 @@ data class HomeUiState(
     val textOptimizationFeedback: TextOptimizationFeedback? = null,
     val mimoSmartTextOptimizationAvailable: Boolean = false,
     val mimoSmartTextOptimizationEnabled: Boolean = false,
+)
+
+private data class SynthesisOutcome(
+    val result: TtsResult,
+    val actualProviderId: String,
+    val actualVoiceId: String?,
+    val noticeMessage: String? = null,
 )
 
 class HomeViewModel(
@@ -229,6 +237,7 @@ class HomeViewModel(
             it.copy(
                 text = value,
                 errorMessage = null,
+                noticeMessage = null,
                 status = HomeStatus.Idle,
                 lastAudioUri = null,
                 lastAudioMimeType = null,
@@ -281,6 +290,7 @@ class HomeViewModel(
                     option.status.isReady -> null
                     else -> providerHealthErrorMessage(option.name, option.status)
                 },
+                noticeMessage = null,
             )
         }
     }
@@ -291,6 +301,7 @@ class HomeViewModel(
                 selectedVoiceStyleId = styleId,
                 lastAudioUri = null,
                 lastAudioMimeType = null,
+                noticeMessage = null,
             )
         }
     }
@@ -301,6 +312,7 @@ class HomeViewModel(
                 selectedVoiceId = voiceId,
                 lastAudioUri = null,
                 lastAudioMimeType = null,
+                noticeMessage = null,
             )
         }
     }
@@ -367,7 +379,7 @@ class HomeViewModel(
     fun previewVoice() {
         viewModelScope.launch {
             val sampleText = "你好，这是 PhraseVoice 的声音试听。Hello, this is a voice preview."
-            _uiState.update { it.copy(status = HomeStatus.Loading, errorMessage = null) }
+            _uiState.update { it.copy(status = HomeStatus.Loading, errorMessage = null, noticeMessage = null) }
             val request = currentRequest(
                 text = sampleText,
                 outputFormat = outputFormatForSelectedProvider(),
@@ -376,12 +388,14 @@ class HomeViewModel(
                 TAG,
                 "preview start provider=${request.providerId} voice=${request.voiceId.orEmpty()}",
             )
-            when (val result = synthesizeForCurrentProvider(request, playAudioFile = true)) {
+            val outcome = synthesizeForCurrentProvider(request, playAudioFile = true)
+            when (val result = outcome.result) {
                 is TtsResult.LocalPlaybackStarted -> {
                     _uiState.update {
                         it.copy(
                             status = HomeStatus.Playing,
                             errorMessage = null,
+                            noticeMessage = outcome.noticeMessage,
                             lastAudioUri = null,
                             lastAudioMimeType = null,
                         )
@@ -395,6 +409,7 @@ class HomeViewModel(
                             lastAudioUri = result.uri.toString(),
                             lastAudioMimeType = result.mimeType,
                             errorMessage = null,
+                            noticeMessage = outcome.noticeMessage,
                         )
                     }
                 }
@@ -402,7 +417,7 @@ class HomeViewModel(
                 is TtsResult.Error -> {
                     AppLogger.e(TAG, "preview failed provider=${request.providerId}: ${result.message}", result.cause)
                     _uiState.update {
-                        it.copy(status = HomeStatus.Error, errorMessage = result.message)
+                        it.copy(status = HomeStatus.Error, errorMessage = result.message, noticeMessage = null)
                     }
                 }
             }
@@ -410,7 +425,7 @@ class HomeViewModel(
     }
 
     fun speakPhrase(phraseId: String, text: String) {
-        _uiState.update { it.copy(text = text) }
+        _uiState.update { it.copy(text = text, noticeMessage = null) }
         viewModelScope.launch {
             phraseRepository.touchPhrase(phraseId)
         }
@@ -431,6 +446,7 @@ class HomeViewModel(
                 it.copy(
                     status = HomeStatus.Loading,
                     errorMessage = null,
+                    noticeMessage = null,
                 )
             }
             val request = currentRequest(text = trimmed, outputFormat = outputFormatForSelectedProvider())
@@ -438,20 +454,22 @@ class HomeViewModel(
                 TAG,
                 "speak start provider=${request.providerId} voice=${request.voiceId.orEmpty()} length=${trimmed.length}",
             )
-            when (val result = synthesizeForCurrentProvider(request, playAudioFile = true)) {
+            val outcome = synthesizeForCurrentProvider(request, playAudioFile = true)
+            when (val result = outcome.result) {
                 is TtsResult.LocalPlaybackStarted -> {
                     if (settingsRepository.settings.first().autoSaveHistory) {
                         historyRepository.addHistory(
                             text = trimmed,
-                            providerId = request.providerId,
-                            voiceId = request.voiceId,
+                            providerId = outcome.actualProviderId,
+                            voiceId = outcome.actualVoiceId,
                         )
                     }
-                    AppLogger.i(TAG, "speak local playback started provider=${request.providerId}")
+                    AppLogger.i(TAG, "speak local playback started provider=${outcome.actualProviderId}")
                     _uiState.update {
                         it.copy(
                             status = HomeStatus.Playing,
                             errorMessage = null,
+                            noticeMessage = outcome.noticeMessage,
                             lastAudioUri = null,
                             lastAudioMimeType = null,
                         )
@@ -462,18 +480,19 @@ class HomeViewModel(
                     if (settingsRepository.settings.first().autoSaveHistory) {
                         historyRepository.addHistory(
                             text = trimmed,
-                            providerId = request.providerId,
-                            voiceId = request.voiceId,
+                            providerId = outcome.actualProviderId,
+                            voiceId = outcome.actualVoiceId,
                             audioUri = result.uri.toString(),
                         )
                     }
-                    AppLogger.i(TAG, "speak audio file ready provider=${request.providerId} uri=${result.uri}")
+                    AppLogger.i(TAG, "speak audio file ready provider=${outcome.actualProviderId} uri=${result.uri}")
                     _uiState.update {
                         it.copy(
                             status = HomeStatus.Playing,
                             lastAudioUri = result.uri.toString(),
                             lastAudioMimeType = result.mimeType,
                             errorMessage = null,
+                            noticeMessage = outcome.noticeMessage,
                         )
                     }
                 }
@@ -481,7 +500,7 @@ class HomeViewModel(
                 is TtsResult.Error -> {
                     AppLogger.e(TAG, "speak failed provider=${request.providerId}: ${result.message}", result.cause)
                     _uiState.update {
-                        it.copy(status = HomeStatus.Error, errorMessage = result.message)
+                        it.copy(status = HomeStatus.Error, errorMessage = result.message, noticeMessage = null)
                     }
                 }
             }
@@ -498,28 +517,30 @@ class HomeViewModel(
         }
 
         viewModelScope.launch {
-            _uiState.update { it.copy(status = HomeStatus.Saving, errorMessage = null) }
+            _uiState.update { it.copy(status = HomeStatus.Saving, errorMessage = null, noticeMessage = null) }
             val outputFormat = outputFormatForSelectedProvider()
             val request = currentRequest(text = trimmed, outputFormat = outputFormat)
             AppLogger.i(
                 TAG,
                 "saveAudio start provider=${request.providerId} voice=${request.voiceId.orEmpty()} format=$outputFormat length=${trimmed.length}",
             )
-            when (val result = synthesizeForCurrentProvider(request, playAudioFile = false)) {
+            val outcome = synthesizeForCurrentProvider(request, playAudioFile = false)
+            when (val result = outcome.result) {
                 is TtsResult.AudioFile -> {
                     historyRepository.addHistory(
                         text = trimmed,
-                        providerId = request.providerId,
-                        voiceId = request.voiceId,
+                        providerId = outcome.actualProviderId,
+                        voiceId = outcome.actualVoiceId,
                         audioUri = result.uri.toString(),
                     )
-                    AppLogger.i(TAG, "saveAudio success provider=${request.providerId} uri=${result.uri}")
+                    AppLogger.i(TAG, "saveAudio success provider=${outcome.actualProviderId} uri=${result.uri}")
                     _uiState.update {
                         it.copy(
                             status = HomeStatus.Idle,
                             lastAudioUri = result.uri.toString(),
                             lastAudioMimeType = result.mimeType,
                             errorMessage = null,
+                            noticeMessage = outcome.noticeMessage,
                         )
                     }
                 }
@@ -527,7 +548,7 @@ class HomeViewModel(
                 is TtsResult.Error -> {
                     AppLogger.e(TAG, "saveAudio failed provider=${request.providerId}: ${result.message}", result.cause)
                     _uiState.update {
-                        it.copy(status = HomeStatus.Error, errorMessage = result.message)
+                        it.copy(status = HomeStatus.Error, errorMessage = result.message, noticeMessage = null)
                     }
                 }
 
@@ -545,15 +566,15 @@ class HomeViewModel(
     private suspend fun synthesizeForCurrentProvider(
         request: TtsRequest,
         playAudioFile: Boolean,
-    ): TtsResult {
+    ): SynthesisOutcome {
         val runtimeConfig = providerConfigRepository.getRuntimeConfig(request.providerId)
         if (!runtimeConfig.config.enabled) {
-            return TtsResult.Error("请先在 Provider 页面启用并保存该 Provider。")
+            return request.outcome(TtsResult.Error("请先在 Provider 页面启用并保存该 Provider。"))
         }
 
         return when (request.providerId) {
             ProviderConfigRepository.ANDROID_SYSTEM -> {
-                if (request.outputFormat == AudioFormat.WAV && !playAudioFile) {
+                val result = if (request.outputFormat == AudioFormat.WAV && !playAudioFile) {
                     val target = audioFileStore.createTarget(AudioFormat.WAV)
                     systemTtsProvider.synthesizeToFile(
                         request = request,
@@ -564,6 +585,7 @@ class HomeViewModel(
                 } else {
                     systemTtsProvider.synthesize(request)
                 }
+                request.outcome(result)
             }
 
             ProviderConfigRepository.OPENAI,
@@ -585,12 +607,68 @@ class HomeViewModel(
                 if (playAudioFile && result is TtsResult.AudioFile) {
                     audioPlaybackController.play(result.uri)
                 }
-                result
+                if (result is TtsResult.Error && settings.cloudFallbackToSystemTts) {
+                    synthesizeWithSystemFallback(request, playAudioFile, result)
+                } else {
+                    request.outcome(result)
+                }
             }
 
-            else -> TtsResult.Error("未知 Provider：${request.providerId}")
+            else -> request.outcome(TtsResult.Error("未知 Provider：${request.providerId}"))
         }
     }
+
+    private suspend fun synthesizeWithSystemFallback(
+        originalRequest: TtsRequest,
+        playAudioFile: Boolean,
+        cloudError: TtsResult.Error,
+    ): SynthesisOutcome {
+        val fallbackRequest = originalRequest.copy(
+            providerId = ProviderConfigRepository.ANDROID_SYSTEM,
+            voiceId = null,
+            language = null,
+            stylePrompt = null,
+            outputFormat = AudioFormat.WAV,
+            mimoOptimizeTextPreview = false,
+        )
+        AppLogger.w(
+            TAG,
+            "cloud provider failed; fallback to system tts provider=${originalRequest.providerId} message=${cloudError.message}",
+        )
+
+        val fallbackResult = if (playAudioFile) {
+            systemTtsProvider.synthesize(fallbackRequest)
+        } else {
+            val target = audioFileStore.createTarget(AudioFormat.WAV)
+            systemTtsProvider.synthesizeToFile(
+                request = fallbackRequest,
+                file = target.file,
+                uri = target.uri,
+                mimeType = target.mimeType,
+            )
+        }
+
+        return when (fallbackResult) {
+            is TtsResult.Error -> fallbackRequest.outcome(
+                TtsResult.Error("云端语音失败，本机语音也暂不可用：${fallbackResult.message}", fallbackResult.cause),
+            )
+            else -> fallbackRequest.outcome(
+                result = fallbackResult,
+                noticeMessage = "云端失败，已切换到本机语音。",
+            )
+        }
+    }
+
+    private fun TtsRequest.outcome(
+        result: TtsResult,
+        noticeMessage: String? = null,
+    ): SynthesisOutcome =
+        SynthesisOutcome(
+            result = result,
+            actualProviderId = providerId,
+            actualVoiceId = voiceId,
+            noticeMessage = noticeMessage,
+        )
 
     private fun outputFormatForSelectedProvider(): AudioFormat =
         when (uiState.value.selectedProviderId) {

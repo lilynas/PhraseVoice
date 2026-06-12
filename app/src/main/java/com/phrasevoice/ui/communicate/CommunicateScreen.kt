@@ -692,15 +692,27 @@ private fun CommunicateStatusMessage(
         )
         state.status == HomeStatus.Error && !state.errorMessage.isNullOrBlank() ->
             localizedHomeErrorMessage(state.errorMessage)
+        !state.noticeMessage.isNullOrBlank() -> state.noticeMessage
         else -> null
     }
 
     if (message != null) {
+        val isNotice = !state.noticeMessage.isNullOrBlank() &&
+            state.status != HomeStatus.Error &&
+            !androidTtsUnavailable &&
+            !selectedProviderUnavailable
         Surface(
-            color = MaterialTheme.colorScheme.errorContainer,
-            contentColor = MaterialTheme.colorScheme.onErrorContainer,
+            color = if (isNotice) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.errorContainer,
+            contentColor = if (isNotice) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onErrorContainer,
             shape = RoundedCornerShape(16.dp),
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.28f)),
+            border = BorderStroke(
+                1.dp,
+                if (isNotice) {
+                    MaterialTheme.colorScheme.primary.copy(alpha = 0.28f)
+                } else {
+                    MaterialTheme.colorScheme.error.copy(alpha = 0.28f)
+                },
+            ),
             modifier = Modifier.fillMaxWidth(),
         ) {
             Text(

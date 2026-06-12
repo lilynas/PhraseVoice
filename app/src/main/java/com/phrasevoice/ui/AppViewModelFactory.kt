@@ -46,6 +46,7 @@ class AppViewModelFactory(
                 settingsRepository = container.settingsRepository,
                 providerConfigRepository = container.providerConfigRepository,
                 audioFileStore = container.audioFileStore,
+                offlineVoiceModelStore = container.offlineVoiceModelStore,
             )
 
             modelClass.isAssignableFrom(ProviderSettingsViewModel::class.java) -> ProviderSettingsViewModel(

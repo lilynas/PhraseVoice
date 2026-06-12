@@ -564,12 +564,30 @@ fun HomeScreen(
     fun StatusSection() {
         if (state.status == HomeStatus.Error ||
             !state.errorMessage.isNullOrBlank() ||
+            !state.noticeMessage.isNullOrBlank() ||
             androidTtsUnavailable ||
             selectedProviderUnavailable
         ) {
+            val isNotice = state.status != HomeStatus.Error &&
+                    !state.noticeMessage.isNullOrBlank() &&
+                    !androidTtsUnavailable &&
+                    !selectedProviderUnavailable
             Card(
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.3f)),
+                colors = CardDefaults.cardColors(
+                    containerColor = if (isNotice) {
+                        MaterialTheme.colorScheme.primaryContainer
+                    } else {
+                        MaterialTheme.colorScheme.errorContainer
+                    },
+                ),
+                border = BorderStroke(
+                    1.dp,
+                    if (isNotice) {
+                        MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)
+                    } else {
+                        MaterialTheme.colorScheme.error.copy(alpha = 0.3f)
+                    },
+                ),
                 shape = RoundedCornerShape(16.dp),
                 modifier = Modifier.fillMaxWidth()
             ) {
@@ -588,9 +606,14 @@ fun HomeScreen(
                             )
                         } else {
                             state.errorMessage?.let { localizedHomeErrorMessage(it) }
+                                ?: state.noticeMessage
                                 ?: t("发生未知错误", "Unknown error")
                         },
-                        color = MaterialTheme.colorScheme.onErrorContainer,
+                        color = if (isNotice) {
+                            MaterialTheme.colorScheme.onPrimaryContainer
+                        } else {
+                            MaterialTheme.colorScheme.onErrorContainer
+                        },
                         style = MaterialTheme.typography.bodyMedium
                     )
                 }

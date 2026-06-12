@@ -67,6 +67,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
+import androidx.compose.material3.SuggestionChip
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -87,6 +88,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.phrasevoice.BuildConfig
 import com.phrasevoice.data.model.DisplayCard
+import com.phrasevoice.data.model.OfflineVoiceModel
 import com.phrasevoice.debug.DebugLogEntry
 import com.phrasevoice.ui.i18n.AppLanguageMode
 import com.phrasevoice.ui.i18n.localizedProviderHealthLabel
@@ -108,6 +110,9 @@ fun SettingsScreen(
     onVolumeChange: (Float) -> Unit,
     onAutoSaveHistoryChange: (Boolean) -> Unit,
     onKeepAudioCacheChange: (Boolean) -> Unit,
+    onCloudFallbackToSystemTtsChange: (Boolean) -> Unit,
+    onImportOfflineVoiceModel: (Uri) -> Unit,
+    onDeleteOfflineVoiceModel: (String) -> Unit,
     onClearAudioCache: () -> Unit,
     onClearDebugLogs: () -> Unit,
     onDebugLoggingEnabledChange: (Boolean) -> Unit,
@@ -185,6 +190,12 @@ fun SettingsScreen(
                     )
                 }
         }
+    }
+
+    val offlineVoiceImportLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument(),
+    ) { uri: Uri? ->
+        if (uri != null) onImportOfflineVoiceModel(uri)
     }
 
     val settings = state.settings
@@ -319,6 +330,24 @@ fun SettingsScreen(
             SwitchSetting(t("自动保存历史", "Auto-save History"), settings.autoSaveHistory, onAutoSaveHistoryChange)
             SwitchSetting(t("保留音频缓存", "Keep Audio Cache"), settings.keepAudioCache, onKeepAudioCacheChange)
         }
+
+        OfflineVoiceSettingsCard(
+            fallbackEnabled = settings.cloudFallbackToSystemTts,
+            models = settings.offlineVoiceModels,
+            message = state.offlineVoiceMessage,
+            onFallbackChange = onCloudFallbackToSystemTtsChange,
+            onImportClick = {
+                offlineVoiceImportLauncher.launch(
+                    arrayOf(
+                        "application/octet-stream",
+                        "application/zip",
+                        "application/x-tar",
+                        "*/*",
+                    ),
+                )
+            },
+            onDelete = onDeleteOfflineVoiceModel,
+        )
 
         DisplayCardsSettingsCard(
             cards = settings.displayCards.sortedBy { it.sortOrder },
@@ -469,6 +498,173 @@ private fun CommunicationDisplaySettingsCard(
         }
     }
 }
+
+@Composable
+private fun OfflineVoiceSettingsCard(
+    fallbackEnabled: Boolean,
+    models: List<OfflineVoiceModel>,
+    message: String?,
+    onFallbackChange: (Boolean) -> Unit,
+    onImportClick: () -> Unit,
+    onDelete: (String) -> Unit,
+) {
+    SettingsCard {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = t("离线语音", "Offline Voice"),
+                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                color = MaterialTheme.colorScheme.primary,
+            )
+            Button(onClick = onImportClick, shape = RoundedCornerShape(14.dp)) {
+                Icon(Icons.Outlined.FileUpload, contentDescription = null, modifier = Modifier.padding(end = 4.dp))
+                Text(t("导入", "Import"))
+            }
+        }
+
+        SwitchSetting(
+            label = t("云端失败时使用本机语音", "Use system voice if cloud fails"),
+            value = fallbackEnabled,
+            onChange = onFallbackChange,
+        )
+
+        message?.takeIf { it.isNotBlank() }?.let { currentMessage ->
+            Text(
+                text = localizedSettingsStatusMessage(currentMessage),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+
+        if (models.isEmpty()) {
+            Surface(
+                color = MaterialTheme.colorScheme.surface,
+                contentColor = MaterialTheme.colorScheme.onSurface,
+                shape = RoundedCornerShape(16.dp),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Column(
+                    modifier = Modifier.padding(14.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    Text(
+                        text = offlineVoiceStatusLabel(OfflineVoiceModel.STATUS_NOT_INSTALLED),
+                        style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                    Text(
+                        text = t(
+                            "导入 sherpa-onnx 模型包后会显示在这里。",
+                            "Imported sherpa-onnx model packages will appear here.",
+                        ),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+        } else {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                models.sortedByDescending { it.importedAt }.forEach { model ->
+                    OfflineVoiceModelRow(model = model, onDelete = onDelete)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun OfflineVoiceModelRow(
+    model: OfflineVoiceModel,
+    onDelete: (String) -> Unit,
+) {
+    Surface(
+        color = MaterialTheme.colorScheme.surface,
+        contentColor = MaterialTheme.colorScheme.onSurface,
+        shape = RoundedCornerShape(16.dp),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Column(
+            modifier = Modifier.padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.Top,
+            ) {
+                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Text(
+                        text = model.name,
+                        style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Text(
+                        text = offlineVoiceModelDetail(model),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                TextButton(onClick = { onDelete(model.id) }) {
+                    Icon(Icons.Outlined.Delete, contentDescription = null, modifier = Modifier.padding(end = 4.dp))
+                    Text(t("删除", "Delete"))
+                }
+            }
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                SuggestionChip(
+                    onClick = {},
+                    label = { Text(offlineVoiceStatusLabel(model.status)) },
+                    shape = RoundedCornerShape(12.dp),
+                )
+                model.language.takeIf { it.isNotBlank() }?.let { language ->
+                    SuggestionChip(
+                        onClick = {},
+                        label = { Text(language) },
+                        shape = RoundedCornerShape(12.dp),
+                    )
+                }
+                SuggestionChip(
+                    onClick = {},
+                    label = { Text(formatBytes(model.sizeBytes)) },
+                    shape = RoundedCornerShape(12.dp),
+                )
+            }
+            model.note?.takeIf { it.isNotBlank() }?.let { note ->
+                Text(
+                    text = note,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+    }
+}
+
+private fun offlineVoiceModelDetail(model: OfflineVoiceModel): String =
+    listOf(
+        model.engine,
+        model.voiceName.takeIf { it.isNotBlank() },
+    )
+        .filterNotNull()
+        .joinToString(" · ")
+
+@Composable
+private fun offlineVoiceStatusLabel(status: String): String =
+    when (status) {
+        OfflineVoiceModel.STATUS_AVAILABLE -> t("可用", "Available")
+        OfflineVoiceModel.STATUS_CORRUPT -> t("损坏", "Corrupt")
+        OfflineVoiceModel.STATUS_INCOMPATIBLE -> t("不兼容", "Incompatible")
+        OfflineVoiceModel.STATUS_LOAD_FAILED -> t("加载失败", "Load Failed")
+        else -> t("未安装", "Not Installed")
+    }
 
 @Composable
 private fun DisplayCardsSettingsCard(
