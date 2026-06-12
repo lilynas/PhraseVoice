@@ -60,7 +60,7 @@ import com.phrasevoice.system.QuickReturnNotifier
 import com.phrasevoice.ui.audio.AudioClipsViewModel
 import com.phrasevoice.ui.communicate.CommunicationDisplayUiState
 import com.phrasevoice.ui.communicate.CommunicateScreen
-import com.phrasevoice.ui.communicate.ContactCardUiState
+import com.phrasevoice.ui.communicate.DisplayCardUiState
 import com.phrasevoice.ui.history.HistoryScreen
 import com.phrasevoice.ui.history.HistoryViewModel
 import com.phrasevoice.ui.home.HomeStatus
@@ -217,12 +217,17 @@ fun PhraseVoiceRoot(
                     when (targetDest) {
                         Destination.Communicate -> CommunicateScreen(
                             state = homeState,
-                            contactCard = ContactCardUiState(
-                                name = settingsState.settings.contactCardName,
-                                subtitle = settingsState.settings.contactCardSubtitle,
-                                account = settingsState.settings.contactCardAccount,
-                                qrContent = settingsState.settings.contactCardQrContent,
-                            ),
+                            displayCards = settingsState.settings.displayCards
+                                .sortedBy { it.sortOrder }
+                                .map { card ->
+                                    DisplayCardUiState(
+                                        id = card.id,
+                                        title = card.title,
+                                        body = card.body,
+                                        type = card.type,
+                                        qrContent = card.qrContent,
+                                    )
+                                },
                             display = CommunicationDisplayUiState(
                                 textScale = settingsState.settings.communicationTextScale,
                                 textTone = settingsState.settings.communicationTextTone,
@@ -368,10 +373,20 @@ fun PhraseVoiceRoot(
                             onCommunicationTextScaleChange = settingsViewModel::updateCommunicationTextScale,
                             onCommunicationTextToneChange = settingsViewModel::updateCommunicationTextTone,
                             onLockScreenCommunicationEnabledChange = settingsViewModel::updateLockScreenCommunicationEnabled,
-                            onContactCardNameChange = settingsViewModel::updateContactCardName,
-                            onContactCardSubtitleChange = settingsViewModel::updateContactCardSubtitle,
-                            onContactCardAccountChange = settingsViewModel::updateContactCardAccount,
-                            onContactCardQrContentChange = settingsViewModel::updateContactCardQrContent,
+                            onAddDisplayCard = settingsViewModel::openAddDisplayCardDialog,
+                            onEditDisplayCard = settingsViewModel::openEditDisplayCardDialog,
+                            onDeleteDisplayCard = settingsViewModel::deleteDisplayCard,
+                            onMoveDisplayCard = settingsViewModel::moveDisplayCard,
+                            onDisplayCardTitleDraftChange = settingsViewModel::updateDisplayCardTitleDraft,
+                            onDisplayCardBodyDraftChange = settingsViewModel::updateDisplayCardBodyDraft,
+                            onDisplayCardTypeDraftChange = settingsViewModel::updateDisplayCardTypeDraft,
+                            onDisplayCardQrContentDraftChange = settingsViewModel::updateDisplayCardQrContentDraft,
+                            onDismissDisplayCardDialog = settingsViewModel::dismissDisplayCardDialog,
+                            onSaveDisplayCardDialog = settingsViewModel::saveDisplayCardDialog,
+                            onBuildDisplayCardsExportJson = settingsViewModel::buildDisplayCardsExportJson,
+                            onImportDisplayCardsJson = settingsViewModel::importDisplayCardsJson,
+                            onDisplayCardsExportCompleted = settingsViewModel::markDisplayCardsExportSuccess,
+                            onDisplayCardFileActionMessage = settingsViewModel::showDisplayCardFileActionMessage,
                             modifier = modifier,
                         )
                     }

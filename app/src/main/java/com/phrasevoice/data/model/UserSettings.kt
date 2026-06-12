@@ -19,6 +19,8 @@ data class UserSettings(
     val contactCardSubtitle: String = "很高兴认识你",
     val contactCardAccount: String = "@phrasevoice",
     val contactCardQrContent: String = "PhraseVoice",
+    val displayCards: List<DisplayCard> = emptyList(),
+    val displayCardsMigrated: Boolean = false,
     val hasCompletedOnboarding: Boolean = false,
     val debugLoggingEnabled: Boolean = false,
     val debugLogLevel: String = "INFO",

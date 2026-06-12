@@ -10,6 +10,7 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -50,6 +51,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -63,6 +65,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.phrasevoice.data.model.AudioClip
+import com.phrasevoice.data.model.DisplayCard
 import com.phrasevoice.data.model.Phrase
 import com.phrasevoice.data.repository.ProviderConfigRepository
 import com.phrasevoice.ui.common.QuickPhraseActionDialog
@@ -77,11 +80,14 @@ import com.phrasevoice.ui.i18n.localizedPhraseGroupName
 import com.phrasevoice.ui.i18n.localizedPhraseTitle
 import com.phrasevoice.ui.i18n.localizedProviderHealthDescription
 import com.phrasevoice.ui.i18n.t
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 
-data class ContactCardUiState(
-    val name: String,
-    val subtitle: String,
-    val account: String,
+data class DisplayCardUiState(
+    val id: String,
+    val title: String,
+    val body: String,
+    val type: String,
     val qrContent: String,
 )
 
@@ -94,7 +100,7 @@ data class CommunicationDisplayUiState(
 @Composable
 fun CommunicateScreen(
     state: HomeUiState,
-    contactCard: ContactCardUiState,
+    displayCards: List<DisplayCardUiState>,
     display: CommunicationDisplayUiState,
     audioClipsState: AudioClipsUiState,
     phraseActionsEditable: Boolean = true,
@@ -119,7 +125,8 @@ fun CommunicateScreen(
         !androidTtsUnavailable &&
         selectedProvider?.enabled == true
     val hasText = state.text.isNotBlank()
-    var showContactCard by remember { mutableStateOf(false) }
+    var selectedDisplayCard by remember { mutableStateOf<DisplayCardUiState?>(null) }
+    var fullScreenQrCard by remember { mutableStateOf<DisplayCardUiState?>(null) }
     var showLargeText by remember { mutableStateOf(false) }
     var phraseAction by remember { mutableStateOf<Phrase?>(null) }
     val audioImportLauncher = rememberLauncherForActivityResult(
@@ -128,10 +135,17 @@ fun CommunicateScreen(
         if (uri != null) onAudioClipImport(uri)
     }
 
-    if (showContactCard) {
-        ContactCardDialog(
-            contactCard = contactCard,
-            onDismiss = { showContactCard = false },
+    selectedDisplayCard?.let { card ->
+        DisplayCardDialog(
+            card = card,
+            onShowQrFullScreen = { fullScreenQrCard = card },
+            onDismiss = { selectedDisplayCard = null },
+        )
+    }
+    fullScreenQrCard?.let { card ->
+        FullScreenQrDialog(
+            card = card,
+            onDismiss = { fullScreenQrCard = null },
         )
     }
     if (showLargeText) {
@@ -174,7 +188,8 @@ fun CommunicateScreen(
                     CommunicateHeader(
                         state = state,
                         providerName = selectedProvider?.name,
-                        onContactCardClick = { showContactCard = true },
+                        displayCardCount = displayCards.size,
+                        onDisplayCardsClick = { selectedDisplayCard = displayCards.firstOrNull() },
                     )
                     TalkingTextField(
                         text = state.text,
@@ -214,6 +229,11 @@ fun CommunicateScreen(
                         onQuickPhraseLongClick = { phraseAction = it },
                         onQuickPhraseGroupSelected = onQuickPhraseGroupSelected,
                     )
+                    DisplayCardsPanel(
+                        cards = displayCards,
+                        compactCards = true,
+                        onDisplayCardClick = { selectedDisplayCard = it },
+                    )
                     AudioClipsPanel(
                         state = audioClipsState,
                         compactCards = true,
@@ -234,7 +254,8 @@ fun CommunicateScreen(
                 CommunicateHeader(
                     state = state,
                     providerName = selectedProvider?.name,
-                    onContactCardClick = { showContactCard = true },
+                    displayCardCount = displayCards.size,
+                    onDisplayCardsClick = { selectedDisplayCard = displayCards.firstOrNull() },
                 )
                 TalkingTextField(
                     text = state.text,
@@ -264,6 +285,11 @@ fun CommunicateScreen(
                     onQuickPhraseLongClick = { phraseAction = it },
                     onQuickPhraseGroupSelected = onQuickPhraseGroupSelected,
                 )
+                DisplayCardsPanel(
+                    cards = displayCards,
+                    compactCards = false,
+                    onDisplayCardClick = { selectedDisplayCard = it },
+                )
                 AudioClipsPanel(
                     state = audioClipsState,
                     compactCards = false,
@@ -280,7 +306,8 @@ fun CommunicateScreen(
 private fun CommunicateHeader(
     state: HomeUiState,
     providerName: String?,
-    onContactCardClick: () -> Unit,
+    displayCardCount: Int,
+    onDisplayCardsClick: () -> Unit,
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -307,7 +334,8 @@ private fun CommunicateHeader(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             OutlinedButton(
-                onClick = onContactCardClick,
+                onClick = onDisplayCardsClick,
+                enabled = displayCardCount > 0,
                 shape = RoundedCornerShape(14.dp),
                 border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
                 contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
@@ -318,7 +346,7 @@ private fun CommunicateHeader(
                     contentDescription = null,
                     modifier = Modifier.padding(end = 6.dp),
                 )
-                Text(t("扩列", "Card"), fontWeight = FontWeight.SemiBold)
+                Text(t("卡片", "Cards"), fontWeight = FontWeight.SemiBold)
             }
             if (state.status == HomeStatus.Playing) {
                 VoiceWaveIndicator(color = MaterialTheme.colorScheme.primary)
@@ -339,17 +367,14 @@ private fun CommunicateHeader(
 }
 
 @Composable
-private fun ContactCardDialog(
-    contactCard: ContactCardUiState,
+private fun DisplayCardDialog(
+    card: DisplayCardUiState,
+    onShowQrFullScreen: () -> Unit,
     onDismiss: () -> Unit,
 ) {
-    val displayName = contactCard.name.ifBlank { t("PhraseVoice", "PhraseVoice") }
-    val subtitle = contactCard.subtitle.ifBlank { t("很高兴认识你", "Nice to meet you") }
-    val account = contactCard.account.ifBlank { t("未填写账号", "No account set") }
-    val qrContent = contactCard.qrContent
-        .ifBlank { contactCard.account }
-        .ifBlank { displayName }
-
+    val title = card.title.ifBlank { t("展示卡片", "Display Card") }
+    val body = card.body.ifBlank { card.qrContent }
+    val qrContent = displayCardQrContent(card)
     AlertDialog(
         onDismissRequest = onDismiss,
         confirmButton = {
@@ -357,9 +382,23 @@ private fun ContactCardDialog(
                 Text(t("收起", "Close"))
             }
         },
+        dismissButton = if (qrContent.isNotBlank()) {
+            {
+                TextButton(onClick = onShowQrFullScreen, shape = RoundedCornerShape(14.dp)) {
+                    Icon(
+                        imageVector = Icons.Outlined.Fullscreen,
+                        contentDescription = null,
+                        modifier = Modifier.padding(end = 4.dp),
+                    )
+                    Text(t("全屏二维码", "Full QR"))
+                }
+            }
+        } else {
+            null
+        },
         title = {
             Text(
-                text = t("扩列名片", "Contact Card"),
+                text = title,
                 style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
             )
         },
@@ -381,48 +420,127 @@ private fun ContactCardDialog(
                         verticalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
                         Text(
-                            text = displayName,
+                            text = title,
                             style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.ExtraBold),
                             textAlign = TextAlign.Center,
                             maxLines = 2,
                             overflow = TextOverflow.Ellipsis,
                         )
-                        Text(
-                            text = subtitle,
-                            style = MaterialTheme.typography.bodyLarge,
-                            textAlign = TextAlign.Center,
-                            maxLines = 3,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                        Text(
-                            text = account,
-                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                            textAlign = TextAlign.Center,
-                            maxLines = 3,
-                            overflow = TextOverflow.Ellipsis,
-                        )
+                        if (body.isNotBlank()) {
+                            Text(
+                                text = body,
+                                style = MaterialTheme.typography.bodyLarge,
+                                textAlign = TextAlign.Center,
+                                maxLines = 6,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
                     }
                 }
 
-                Surface(
-                    color = MaterialTheme.colorScheme.surface,
-                    contentColor = MaterialTheme.colorScheme.onSurface,
-                    shape = RoundedCornerShape(18.dp),
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
-                ) {
-                    QrCodeImage(
-                        content = qrContent,
-                        modifier = Modifier
-                            .fillMaxWidth(0.72f)
-                            .aspectRatio(1f)
-                            .background(MaterialTheme.colorScheme.surface)
-                            .padding(12.dp),
-                    )
+                if (qrContent.isNotBlank()) {
+                    Surface(
+                        color = MaterialTheme.colorScheme.surface,
+                        contentColor = MaterialTheme.colorScheme.onSurface,
+                        shape = RoundedCornerShape(18.dp),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                    ) {
+                        QrCodeImage(
+                            content = qrContent,
+                            modifier = Modifier
+                                .fillMaxWidth(0.72f)
+                                .aspectRatio(1f)
+                                .background(MaterialTheme.colorScheme.surface)
+                                .padding(12.dp),
+                        )
+                    }
                 }
             }
         },
     )
 }
+
+@Composable
+private fun FullScreenQrDialog(
+    card: DisplayCardUiState,
+    onDismiss: () -> Unit,
+) {
+    val qrContent = displayCardQrContent(card)
+    if (qrContent.isBlank()) return
+
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false),
+    ) {
+        Surface(
+            color = MaterialTheme.colorScheme.background,
+            contentColor = MaterialTheme.colorScheme.onBackground,
+            modifier = Modifier.fillMaxSize(),
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(22.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(18.dp),
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        text = card.title.ifBlank { t("二维码", "QR") },
+                        style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f),
+                    )
+                    TextButton(onClick = onDismiss) {
+                        Text(t("关闭", "Close"))
+                    }
+                }
+
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth(),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Surface(
+                        color = MaterialTheme.colorScheme.surface,
+                        shape = RoundedCornerShape(22.dp),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                    ) {
+                        QrCodeImage(
+                            content = qrContent,
+                            modifier = Modifier
+                                .fillMaxWidth(0.86f)
+                                .aspectRatio(1f)
+                                .background(MaterialTheme.colorScheme.surface)
+                                .padding(16.dp),
+                        )
+                    }
+                }
+
+                card.body.takeIf { it.isNotBlank() }?.let { body ->
+                    Text(
+                        text = body,
+                        style = MaterialTheme.typography.titleMedium,
+                        textAlign = TextAlign.Center,
+                        maxLines = 3,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+        }
+    }
+}
+
+private fun displayCardQrContent(card: DisplayCardUiState): String =
+    card.qrContent.ifBlank {
+        if (card.type == DisplayCard.TYPE_QR) card.body else ""
+    }
 
 @Composable
 private fun TalkingTextField(
@@ -710,6 +828,138 @@ private fun QuickPhrasePanel(
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+@OptIn(ExperimentalLayoutApi::class)
+private fun DisplayCardsPanel(
+    cards: List<DisplayCardUiState>,
+    compactCards: Boolean,
+    onDisplayCardClick: (DisplayCardUiState) -> Unit,
+) {
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = t("展示卡片", "Display Cards"),
+                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.86f),
+            )
+            Text(
+                text = t("${cards.size} 张", "${cards.size} cards"),
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+
+        if (cards.isEmpty()) {
+            Surface(
+                color = MaterialTheme.colorScheme.surfaceVariant,
+                contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                shape = RoundedCornerShape(16.dp),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)),
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text(
+                    text = t("可以在设置里添加常用展示卡片。", "Add display cards in Settings."),
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.padding(14.dp),
+                )
+            }
+        } else if (compactCards) {
+            FlowRow(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                cards.forEach { card ->
+                    DisplayCardButton(
+                        card = card,
+                        onClick = { onDisplayCardClick(card) },
+                        modifier = Modifier.widthIn(min = 152.dp, max = 240.dp),
+                    )
+                }
+            }
+        } else {
+            cards.chunked(2).forEach { rowCards ->
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    rowCards.forEach { card ->
+                        DisplayCardButton(
+                            card = card,
+                            onClick = { onDisplayCardClick(card) },
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
+                    repeat(2 - rowCards.size) {
+                        Spacer(modifier = Modifier.weight(1f))
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun DisplayCardButton(
+    card: DisplayCardUiState,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val qrContent = displayCardQrContent(card)
+    Surface(
+        shape = RoundedCornerShape(16.dp),
+        color = MaterialTheme.colorScheme.surface,
+        contentColor = MaterialTheme.colorScheme.onSurface,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+        modifier = modifier
+            .heightIn(min = 70.dp)
+            .clickable(onClick = onClick),
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 10.dp, vertical = 9.dp),
+            verticalArrangement = Arrangement.spacedBy(2.dp),
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = card.title.ifBlank { t("展示卡片", "Display Card") },
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.weight(1f),
+                )
+                if (qrContent.isNotBlank()) {
+                    Icon(
+                        imageVector = Icons.Outlined.QrCode2,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                    )
+                }
+            }
+            Text(
+                text = card.body.ifBlank { qrContent },
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
         }
     }
 }

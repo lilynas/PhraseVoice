@@ -1,5 +1,9 @@
 package com.phrasevoice.ui.settings
 
+import android.content.Context
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -26,21 +30,28 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material3.AlertDialog
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.material.icons.automirrored.outlined.VolumeMute
 import androidx.compose.material.icons.automirrored.outlined.VolumeUp
+import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.ArrowDownward
 import androidx.compose.material.icons.outlined.ArrowUpward
 import androidx.compose.material.icons.outlined.BrightnessAuto
 import androidx.compose.material.icons.outlined.DarkMode
+import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.DirectionsRun
 import androidx.compose.material.icons.outlined.DirectionsWalk
+import androidx.compose.material.icons.outlined.Edit
+import androidx.compose.material.icons.outlined.FileDownload
+import androidx.compose.material.icons.outlined.FileUpload
 import androidx.compose.material.icons.outlined.LightMode
 import androidx.compose.material.icons.outlined.QrCode2
 import androidx.compose.material.icons.outlined.Translate
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
@@ -51,6 +62,7 @@ import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Slider
@@ -63,6 +75,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -73,6 +86,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.phrasevoice.BuildConfig
+import com.phrasevoice.data.model.DisplayCard
 import com.phrasevoice.debug.DebugLogEntry
 import com.phrasevoice.ui.i18n.AppLanguageMode
 import com.phrasevoice.ui.i18n.localizedProviderHealthLabel
@@ -82,6 +96,7 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import kotlin.math.roundToInt
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -103,10 +118,20 @@ fun SettingsScreen(
     onCommunicationTextScaleChange: (Float) -> Unit,
     onCommunicationTextToneChange: (String) -> Unit,
     onLockScreenCommunicationEnabledChange: (Boolean) -> Unit,
-    onContactCardNameChange: (String) -> Unit,
-    onContactCardSubtitleChange: (String) -> Unit,
-    onContactCardAccountChange: (String) -> Unit,
-    onContactCardQrContentChange: (String) -> Unit,
+    onAddDisplayCard: () -> Unit,
+    onEditDisplayCard: (DisplayCard) -> Unit,
+    onDeleteDisplayCard: (String) -> Unit,
+    onMoveDisplayCard: (String, Int) -> Unit,
+    onDisplayCardTitleDraftChange: (String) -> Unit,
+    onDisplayCardBodyDraftChange: (String) -> Unit,
+    onDisplayCardTypeDraftChange: (String) -> Unit,
+    onDisplayCardQrContentDraftChange: (String) -> Unit,
+    onDismissDisplayCardDialog: () -> Unit,
+    onSaveDisplayCardDialog: () -> Unit,
+    onBuildDisplayCardsExportJson: suspend () -> String,
+    onImportDisplayCardsJson: (String) -> Unit,
+    onDisplayCardsExportCompleted: () -> Unit,
+    onDisplayCardFileActionMessage: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     LaunchedEffect(Unit) {
@@ -117,6 +142,49 @@ fun SettingsScreen(
 
     if (showAboutDialog) {
         AboutDialog(onDismiss = { showAboutDialog = false })
+    }
+
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var pendingDisplayCardsExportJson by remember { mutableStateOf<String?>(null) }
+    val exportCardsFailedPrefix = t("导出失败：", "Export failed: ")
+    val importCardsFailedPrefix = t("导入失败：", "Import failed: ")
+    val cannotWriteCardsFile = t("无法写入文件", "Unable to write file")
+    val cannotReadCardsFile = t("无法读取文件", "Unable to read file")
+    val cannotCreateCardsFile = t("无法生成文件", "Unable to create file")
+
+    val displayCardsExportLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.CreateDocument("application/json"),
+    ) { uri: Uri? ->
+        val json = pendingDisplayCardsExportJson
+        pendingDisplayCardsExportJson = null
+        if (uri == null || json == null) return@rememberLauncherForActivityResult
+
+        scope.launch {
+            runCatching { context.writeTextToUri(uri, json) }
+                .onSuccess { onDisplayCardsExportCompleted() }
+                .onFailure { throwable ->
+                    onDisplayCardFileActionMessage(
+                        "$exportCardsFailedPrefix${throwable.message ?: cannotWriteCardsFile}",
+                    )
+                }
+        }
+    }
+
+    val displayCardsImportLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument(),
+    ) { uri: Uri? ->
+        if (uri == null) return@rememberLauncherForActivityResult
+
+        scope.launch {
+            runCatching { context.readTextFromUri(uri) }
+                .onSuccess(onImportDisplayCardsJson)
+                .onFailure { throwable ->
+                    onDisplayCardFileActionMessage(
+                        "$importCardsFailedPrefix${throwable.message ?: cannotReadCardsFile}",
+                    )
+                }
+        }
     }
 
     val settings = state.settings
@@ -252,15 +320,30 @@ fun SettingsScreen(
             SwitchSetting(t("保留音频缓存", "Keep Audio Cache"), settings.keepAudioCache, onKeepAudioCacheChange)
         }
 
-        ContactCardSettingsCard(
-            name = settings.contactCardName,
-            subtitle = settings.contactCardSubtitle,
-            account = settings.contactCardAccount,
-            qrContent = settings.contactCardQrContent,
-            onNameChange = onContactCardNameChange,
-            onSubtitleChange = onContactCardSubtitleChange,
-            onAccountChange = onContactCardAccountChange,
-            onQrContentChange = onContactCardQrContentChange,
+        DisplayCardsSettingsCard(
+            cards = settings.displayCards.sortedBy { it.sortOrder },
+            fileActionMessage = state.displayCardFileActionMessage,
+            onAdd = onAddDisplayCard,
+            onEdit = onEditDisplayCard,
+            onDelete = onDeleteDisplayCard,
+            onMove = onMoveDisplayCard,
+            onImportClick = {
+                displayCardsImportLauncher.launch(arrayOf("application/json", "text/*", "*/*"))
+            },
+            onExportClick = {
+                scope.launch {
+                    runCatching { onBuildDisplayCardsExportJson() }
+                        .onSuccess { json ->
+                            pendingDisplayCardsExportJson = json
+                            displayCardsExportLauncher.launch("phrasevoice-display-cards.json")
+                        }
+                        .onFailure { throwable ->
+                            onDisplayCardFileActionMessage(
+                                "$exportCardsFailedPrefix${throwable.message ?: cannotCreateCardsFile}",
+                            )
+                        }
+                }
+            },
         )
 
         AudioCacheCard(
@@ -301,6 +384,18 @@ fun SettingsScreen(
             onClearDebugLogs = onClearDebugLogs,
             onEnabledChange = onDebugLoggingEnabledChange,
             onLevelChange = onDebugLogLevelChange,
+        )
+    }
+
+    if (state.displayCardEditor.isOpen) {
+        DisplayCardEditorDialog(
+            editor = state.displayCardEditor,
+            onTitleDraftChange = onDisplayCardTitleDraftChange,
+            onBodyDraftChange = onDisplayCardBodyDraftChange,
+            onTypeDraftChange = onDisplayCardTypeDraftChange,
+            onQrContentDraftChange = onDisplayCardQrContentDraftChange,
+            onDismiss = onDismissDisplayCardDialog,
+            onSave = onSaveDisplayCardDialog,
         )
     }
 }
@@ -376,15 +471,15 @@ private fun CommunicationDisplaySettingsCard(
 }
 
 @Composable
-private fun ContactCardSettingsCard(
-    name: String,
-    subtitle: String,
-    account: String,
-    qrContent: String,
-    onNameChange: (String) -> Unit,
-    onSubtitleChange: (String) -> Unit,
-    onAccountChange: (String) -> Unit,
-    onQrContentChange: (String) -> Unit,
+private fun DisplayCardsSettingsCard(
+    cards: List<DisplayCard>,
+    fileActionMessage: String?,
+    onAdd: () -> Unit,
+    onEdit: (DisplayCard) -> Unit,
+    onDelete: (String) -> Unit,
+    onMove: (String, Int) -> Unit,
+    onImportClick: () -> Unit,
+    onExportClick: () -> Unit,
 ) {
     SettingsCard {
         Row(
@@ -393,47 +488,242 @@ private fun ContactCardSettingsCard(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
-                text = t("扩列名片", "Contact Card"),
+                text = t("展示卡片", "Display Cards"),
                 style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                 color = MaterialTheme.colorScheme.primary,
             )
-            Icon(
-                imageVector = Icons.Outlined.QrCode2,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
+            Button(onClick = onAdd, shape = RoundedCornerShape(14.dp)) {
+                Icon(Icons.Outlined.Add, contentDescription = null, modifier = Modifier.padding(end = 4.dp))
+                Text(t("新增", "Add"))
+            }
+        }
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            OutlinedButton(
+                onClick = onImportClick,
+                shape = RoundedCornerShape(14.dp),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                modifier = Modifier.weight(1f),
+            ) {
+                Icon(Icons.Outlined.FileUpload, contentDescription = null, modifier = Modifier.padding(end = 4.dp))
+                Text(t("导入", "Import"))
+            }
+            OutlinedButton(
+                onClick = onExportClick,
+                enabled = cards.isNotEmpty(),
+                shape = RoundedCornerShape(14.dp),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                modifier = Modifier.weight(1f),
+            ) {
+                Icon(Icons.Outlined.FileDownload, contentDescription = null, modifier = Modifier.padding(end = 4.dp))
+                Text(t("导出", "Export"))
+            }
+        }
+
+        fileActionMessage?.takeIf { it.isNotBlank() }?.let { message ->
+            Text(
+                text = message,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.primary,
             )
         }
 
-        ContactCardTextField(
-            value = name,
-            onValueChange = onNameChange,
-            label = t("展示名称", "Display Name"),
-            minLines = 1,
-            maxLines = 1,
-        )
-        ContactCardTextField(
-            value = subtitle,
-            onValueChange = onSubtitleChange,
-            label = t("副标题", "Subtitle"),
-            minLines = 1,
-            maxLines = 2,
-        )
-        ContactCardTextField(
-            value = account,
-            onValueChange = onAccountChange,
-            label = t("账号", "Account"),
-            minLines = 1,
-            maxLines = 2,
-        )
-        ContactCardTextField(
-            value = qrContent,
-            onValueChange = onQrContentChange,
-            label = t("二维码内容", "QR Content"),
-            minLines = 2,
-            maxLines = 4,
-        )
+        if (cards.isEmpty()) {
+            Text(
+                text = t("还没有展示卡片。", "No display cards yet."),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        } else {
+            cards.forEachIndexed { index, card ->
+                DisplayCardSettingsRow(
+                    card = card,
+                    canMoveUp = index > 0,
+                    canMoveDown = index < cards.lastIndex,
+                    onEdit = { onEdit(card) },
+                    onDelete = { onDelete(card.id) },
+                    onMoveUp = { onMove(card.id, -1) },
+                    onMoveDown = { onMove(card.id, 1) },
+                )
+            }
+        }
     }
 }
+
+@Composable
+private fun DisplayCardSettingsRow(
+    card: DisplayCard,
+    canMoveUp: Boolean,
+    canMoveDown: Boolean,
+    onEdit: () -> Unit,
+    onDelete: () -> Unit,
+    onMoveUp: () -> Unit,
+    onMoveDown: () -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .border(
+                BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                RoundedCornerShape(16.dp),
+            )
+            .padding(12.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.Top,
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = card.title.ifBlank { t("未命名卡片", "Untitled Card") },
+                    style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Bold),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    text = displayCardTypeLabel(card.type),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+            }
+            if (card.qrContent.isNotBlank()) {
+                Icon(
+                    imageVector = Icons.Outlined.QrCode2,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                )
+            }
+        }
+
+        Text(
+            text = card.body.ifBlank { card.qrContent },
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+        )
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.End,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            TextButton(onClick = onMoveUp, enabled = canMoveUp) {
+                Icon(Icons.Outlined.ArrowUpward, contentDescription = null, modifier = Modifier.size(16.dp))
+            }
+            TextButton(onClick = onMoveDown, enabled = canMoveDown) {
+                Icon(Icons.Outlined.ArrowDownward, contentDescription = null, modifier = Modifier.size(16.dp))
+            }
+            TextButton(onClick = onEdit) {
+                Icon(Icons.Outlined.Edit, contentDescription = null, modifier = Modifier.size(16.dp))
+                Text(t("编辑", "Edit"))
+            }
+            TextButton(onClick = onDelete) {
+                Icon(Icons.Outlined.Delete, contentDescription = null, modifier = Modifier.size(16.dp))
+                Text(t("删除", "Delete"))
+            }
+        }
+    }
+}
+
+@Composable
+@OptIn(ExperimentalLayoutApi::class)
+private fun DisplayCardEditorDialog(
+    editor: DisplayCardEditorState,
+    onTitleDraftChange: (String) -> Unit,
+    onBodyDraftChange: (String) -> Unit,
+    onTypeDraftChange: (String) -> Unit,
+    onQrContentDraftChange: (String) -> Unit,
+    onDismiss: () -> Unit,
+    onSave: () -> Unit,
+) {
+    val typeOptions = listOf(
+        DisplayCard.TYPE_TEXT to t("文字", "Text"),
+        DisplayCard.TYPE_CONTACT to t("联系方式", "Contact"),
+        DisplayCard.TYPE_QR to t("二维码", "QR"),
+    )
+    val canSave = editor.bodyDraft.isNotBlank() || editor.qrContentDraft.isNotBlank()
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        shape = RoundedCornerShape(28.dp),
+        title = {
+            Text(
+                text = if (editor.editingCardId == null) {
+                    t("新增展示卡片", "Add Display Card")
+                } else {
+                    t("编辑展示卡片", "Edit Display Card")
+                },
+                style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
+            )
+        },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    typeOptions.forEach { (type, label) ->
+                        FilterChip(
+                            selected = editor.typeDraft == type,
+                            onClick = { onTypeDraftChange(type) },
+                            label = { Text(label) },
+                            shape = RoundedCornerShape(12.dp),
+                        )
+                    }
+                }
+                ContactCardTextField(
+                    value = editor.titleDraft,
+                    onValueChange = onTitleDraftChange,
+                    label = t("标题", "Title"),
+                    minLines = 1,
+                    maxLines = 1,
+                )
+                ContactCardTextField(
+                    value = editor.bodyDraft,
+                    onValueChange = onBodyDraftChange,
+                    label = if (editor.typeDraft == DisplayCard.TYPE_QR) {
+                        t("说明文字（可选）", "Caption (optional)")
+                    } else {
+                        t("展示内容", "Display Content")
+                    },
+                    minLines = 3,
+                    maxLines = 5,
+                )
+                ContactCardTextField(
+                    value = editor.qrContentDraft,
+                    onValueChange = onQrContentDraftChange,
+                    label = t("二维码内容（可选）", "QR Content (optional)"),
+                    minLines = 2,
+                    maxLines = 4,
+                )
+            }
+        },
+        confirmButton = {
+            Button(onClick = onSave, enabled = canSave, shape = RoundedCornerShape(14.dp)) {
+                Text(t("保存", "Save"))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss, shape = RoundedCornerShape(14.dp)) {
+                Text(t("取消", "Cancel"))
+            }
+        },
+    )
+}
+
+@Composable
+private fun displayCardTypeLabel(type: String): String =
+    when (type) {
+        DisplayCard.TYPE_CONTACT -> t("联系方式", "Contact")
+        DisplayCard.TYPE_QR -> t("二维码", "QR")
+        else -> t("文字", "Text")
+    }
 
 @Composable
 private fun ContactCardTextField(
@@ -881,6 +1171,17 @@ private fun formatBytes(bytes: Long): String {
         unitIndex += 1
     }
     return "%.1f %s".format(Locale.US, value, units[unitIndex])
+}
+
+private fun Context.readTextFromUri(uri: Uri): String =
+    contentResolver.openInputStream(uri)?.use { input ->
+        input.bufferedReader(Charsets.UTF_8).readText()
+    } ?: error("无法打开文件")
+
+private fun Context.writeTextToUri(uri: Uri, text: String) {
+    contentResolver.openOutputStream(uri, "wt")?.use { output ->
+        output.write(text.toByteArray(Charsets.UTF_8))
+    } ?: error("无法打开文件")
 }
 
 @Composable
