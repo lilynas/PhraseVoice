@@ -102,6 +102,7 @@ fun SettingsScreen(
     onLanguageModeChange: (String) -> Unit,
     onCommunicationTextScaleChange: (Float) -> Unit,
     onCommunicationTextToneChange: (String) -> Unit,
+    onLockScreenCommunicationEnabledChange: (Boolean) -> Unit,
     onContactCardNameChange: (String) -> Unit,
     onContactCardSubtitleChange: (String) -> Unit,
     onContactCardAccountChange: (String) -> Unit,
@@ -180,6 +181,19 @@ fun SettingsScreen(
             onTextScaleChange = onCommunicationTextScaleChange,
             onTextToneChange = onCommunicationTextToneChange,
         )
+
+        SettingsCard {
+            Text(
+                text = t("锁屏交流", "Lock Screen Talk"),
+                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                color = MaterialTheme.colorScheme.primary,
+            )
+            SwitchSetting(
+                label = t("锁屏交流模式", "Lock Screen Talk"),
+                value = settings.lockScreenCommunicationEnabled,
+                onChange = onLockScreenCommunicationEnabledChange,
+            )
+        }
 
         SettingsCard {
             Text(

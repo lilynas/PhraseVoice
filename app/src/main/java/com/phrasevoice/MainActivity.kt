@@ -1,6 +1,7 @@
 package com.phrasevoice
 
 import android.Manifest
+import android.app.KeyguardManager
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
@@ -11,14 +12,18 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.runtime.mutableStateOf
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.lifecycleScope
 import com.phrasevoice.system.QuickReturnNotifier
 import com.phrasevoice.ui.PhraseVoiceRoot
+import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
     private val communicationRequestKey = mutableStateOf(0)
     private val notificationReplayRequestKey = mutableStateOf(0)
     private val notificationReplayText = mutableStateOf("")
     private val notificationStopRequestKey = mutableStateOf(0)
+    private val lockScreenCommunicationEnabled = mutableStateOf(true)
+    private val deviceLocked = mutableStateOf(false)
     private val notificationPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission(),
     ) { granted ->
@@ -29,10 +34,19 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        configureCommunicationWindow()
+        val appContainer = (application as PhraseVoiceApp).container
+        configureCommunicationWindow(lockScreenCommunicationEnabled.value)
+        refreshDeviceLockedState()
         handleIntent(intent)
 
-        val appContainer = (application as PhraseVoiceApp).container
+        lifecycleScope.launch {
+            appContainer.settingsRepository.settings.collect { settings ->
+                lockScreenCommunicationEnabled.value = settings.lockScreenCommunicationEnabled
+                configureCommunicationWindow(settings.lockScreenCommunicationEnabled)
+                refreshDeviceLockedState()
+            }
+        }
+
         setContent {
             PhraseVoiceRoot(
                 container = appContainer,
@@ -40,6 +54,7 @@ class MainActivity : ComponentActivity() {
                 notificationReplayRequestKey = notificationReplayRequestKey.value,
                 notificationReplayText = notificationReplayText.value,
                 notificationStopRequestKey = notificationStopRequestKey.value,
+                lockScreenActive = lockScreenCommunicationEnabled.value && deviceLocked.value,
             )
         }
 
@@ -53,18 +68,42 @@ class MainActivity : ComponentActivity() {
         QuickReturnNotifier.show(this)
     }
 
-    private fun configureCommunicationWindow() {
+    override fun onResume() {
+        super.onResume()
+        refreshDeviceLockedState()
+    }
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (hasFocus) {
+            refreshDeviceLockedState()
+        }
+    }
+
+    private fun configureCommunicationWindow(enabled: Boolean) {
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
-            setShowWhenLocked(true)
-            setTurnScreenOn(true)
+            setShowWhenLocked(enabled)
+            setTurnScreenOn(enabled)
         } else {
             @Suppress("DEPRECATION")
-            window.addFlags(
-                WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or
-                    WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON,
-            )
+            if (enabled) {
+                window.addFlags(
+                    WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or
+                        WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON,
+                )
+            } else {
+                window.clearFlags(
+                    WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or
+                        WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON,
+                )
+            }
         }
+    }
+
+    private fun refreshDeviceLockedState() {
+        val keyguardManager = getSystemService(KeyguardManager::class.java)
+        deviceLocked.value = keyguardManager?.isKeyguardLocked == true
     }
 
     private fun requestNotificationPermissionAndShow() {

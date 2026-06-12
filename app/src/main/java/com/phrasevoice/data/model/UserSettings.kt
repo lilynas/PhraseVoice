@@ -14,6 +14,7 @@ data class UserSettings(
     val languageMode: String = "system",
     val communicationTextScale: Float = 1.0f,
     val communicationTextTone: String = "mint",
+    val lockScreenCommunicationEnabled: Boolean = true,
     val contactCardName: String = "PhraseVoice",
     val contactCardSubtitle: String = "很高兴认识你",
     val contactCardAccount: String = "@phrasevoice",

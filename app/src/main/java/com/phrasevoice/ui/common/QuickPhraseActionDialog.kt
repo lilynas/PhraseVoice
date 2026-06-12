@@ -13,6 +13,7 @@ import com.phrasevoice.ui.i18n.t
 @Composable
 fun QuickPhraseActionDialog(
     phrase: Phrase,
+    canEdit: Boolean = true,
     onDismiss: () -> Unit,
     onEdit: (Phrase) -> Unit,
     onToggleFavorite: (Phrase) -> Unit,
@@ -35,13 +36,15 @@ fun QuickPhraseActionDialog(
             )
         },
         confirmButton = {
-            TextButton(
-                onClick = {
-                    onDismiss()
-                    onEdit(phrase)
-                },
-            ) {
-                Text(t("编辑", "Edit"))
+            if (canEdit) {
+                TextButton(
+                    onClick = {
+                        onDismiss()
+                        onEdit(phrase)
+                    },
+                ) {
+                    Text(t("编辑", "Edit"))
+                }
             }
         },
         dismissButton = {

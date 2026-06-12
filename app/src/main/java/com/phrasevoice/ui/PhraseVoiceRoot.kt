@@ -106,6 +106,7 @@ fun PhraseVoiceRoot(
     notificationReplayRequestKey: Int = 0,
     notificationReplayText: String = "",
     notificationStopRequestKey: Int = 0,
+    lockScreenActive: Boolean = false,
 ) {
     val factory = remember(container) { AppViewModelFactory(container) }
     val homeViewModel: HomeViewModel = viewModel(factory = factory)
@@ -128,6 +129,13 @@ fun PhraseVoiceRoot(
         else -> isSystemDark
     }
     val appLanguage = resolveAppLanguage(settingsState.settings.languageMode)
+    val visibleDestination = if (lockScreenActive) Destination.Communicate else destination
+
+    LaunchedEffect(lockScreenActive) {
+        if (lockScreenActive) {
+            destination = Destination.Communicate
+        }
+    }
 
     LaunchedEffect(communicationRequestKey) {
         if (communicationRequestKey > 0) {
@@ -168,27 +176,29 @@ fun PhraseVoiceRoot(
 
             Scaffold(
                 bottomBar = {
-                    NavigationBar {
-                        Destination.entries.forEach { item ->
-                            val isSelected = destination == item
-                            val label = item.label()
-                            NavigationBarItem(
-                                selected = isSelected,
-                                onClick = { destination = item },
-                                icon = {
-                                    Icon(
-                                        imageVector = if (isSelected) item.selectedIcon else item.unselectedIcon,
-                                        contentDescription = label
-                                    )
-                                },
-                                label = { Text(label) },
-                            )
+                    if (!lockScreenActive) {
+                        NavigationBar {
+                            Destination.entries.forEach { item ->
+                                val isSelected = destination == item
+                                val label = item.label()
+                                NavigationBarItem(
+                                    selected = isSelected,
+                                    onClick = { destination = item },
+                                    icon = {
+                                        Icon(
+                                            imageVector = if (isSelected) item.selectedIcon else item.unselectedIcon,
+                                            contentDescription = label
+                                        )
+                                    },
+                                    label = { Text(label) },
+                                )
+                            }
                         }
                     }
                 },
             ) { innerPadding ->
                 AnimatedContent(
-                    targetState = destination,
+                    targetState = visibleDestination,
                     transitionSpec = {
                         val stiffness = Spring.StiffnessLow
                         if (targetState.ordinal > initialState.ordinal) {
@@ -218,6 +228,7 @@ fun PhraseVoiceRoot(
                                 textTone = settingsState.settings.communicationTextTone,
                             ),
                             audioClipsState = audioClipsState,
+                            phraseActionsEditable = !lockScreenActive,
                             onTextChange = homeViewModel::updateText,
                             onQuickPhraseClick = { phrase ->
                                 homeViewModel.stop()
@@ -356,6 +367,7 @@ fun PhraseVoiceRoot(
                             onLanguageModeChange = settingsViewModel::updateLanguageMode,
                             onCommunicationTextScaleChange = settingsViewModel::updateCommunicationTextScale,
                             onCommunicationTextToneChange = settingsViewModel::updateCommunicationTextTone,
+                            onLockScreenCommunicationEnabledChange = settingsViewModel::updateLockScreenCommunicationEnabled,
                             onContactCardNameChange = settingsViewModel::updateContactCardName,
                             onContactCardSubtitleChange = settingsViewModel::updateContactCardSubtitle,
                             onContactCardAccountChange = settingsViewModel::updateContactCardAccount,

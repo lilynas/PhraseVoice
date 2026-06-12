@@ -122,6 +122,10 @@ class SettingsViewModel(
         update { it.copy(communicationTextTone = normalized) }
     }
 
+    fun updateLockScreenCommunicationEnabled(value: Boolean) {
+        update { it.copy(lockScreenCommunicationEnabled = value) }
+    }
+
     fun updateContactCardName(value: String) {
         update { it.copy(contactCardName = value) }
     }

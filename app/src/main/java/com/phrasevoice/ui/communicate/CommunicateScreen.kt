@@ -97,6 +97,7 @@ fun CommunicateScreen(
     contactCard: ContactCardUiState,
     display: CommunicationDisplayUiState,
     audioClipsState: AudioClipsUiState,
+    phraseActionsEditable: Boolean = true,
     onTextChange: (String) -> Unit,
     onQuickPhraseClick: (Phrase) -> Unit,
     onQuickPhraseEdit: (Phrase) -> Unit,
@@ -148,6 +149,7 @@ fun CommunicateScreen(
     phraseAction?.let { phrase ->
         QuickPhraseActionDialog(
             phrase = phrase,
+            canEdit = phraseActionsEditable,
             onDismiss = { phraseAction = null },
             onEdit = onQuickPhraseEdit,
             onToggleFavorite = onQuickPhraseFavoriteToggle,
