@@ -12,7 +12,7 @@ PhraseVoice is a lightweight Android text-to-speech app for quickly reading text
 ## Screenshots
 
 <p>
-  <img src="docs/screenshots/en/home.png" width="220" alt="Read screen" />
+  <img src="docs/screenshots/en/home.png" width="220" alt="Studio screen" />
   <img src="docs/screenshots/en/provider.png" width="220" alt="Provider settings" />
   <img src="docs/screenshots/en/settings.png" width="220" alt="Settings screen" />
 </p>

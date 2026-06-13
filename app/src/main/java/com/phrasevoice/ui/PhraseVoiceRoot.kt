@@ -4,13 +4,11 @@ import android.app.Activity
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.History
-import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.RecordVoiceOver
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.outlined.Build
 import androidx.compose.material.icons.outlined.History
-import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.List
 import androidx.compose.material.icons.outlined.RecordVoiceOver
 import androidx.compose.material.icons.outlined.Settings
@@ -64,7 +62,6 @@ import com.phrasevoice.ui.communicate.DisplayCardUiState
 import com.phrasevoice.ui.history.HistoryScreen
 import com.phrasevoice.ui.history.HistoryViewModel
 import com.phrasevoice.ui.home.HomeStatus
-import com.phrasevoice.ui.home.HomeScreen
 import com.phrasevoice.ui.home.HomeViewModel
 import com.phrasevoice.ui.i18n.LocalAppLanguage
 import com.phrasevoice.ui.i18n.resolveAppLanguage
@@ -81,7 +78,6 @@ private enum class Destination(
     val unselectedIcon: ImageVector,
 ) {
     Communicate(Icons.Filled.RecordVoiceOver, Icons.Outlined.RecordVoiceOver),
-    Home(Icons.Filled.Home, Icons.Outlined.Home),
     Library(Icons.Filled.List, Icons.Outlined.List),
     History(Icons.Filled.History, Icons.Outlined.History),
     Providers(Icons.Filled.Build, Icons.Outlined.Build),
@@ -91,8 +87,7 @@ private enum class Destination(
 @Composable
 private fun Destination.label(): String =
     when (this) {
-        Destination.Communicate -> t("交流", "Talk")
-        Destination.Home -> t("朗读", "Read")
+        Destination.Communicate -> t("工作台", "Studio")
         Destination.Library -> t("常用语", "Phrases")
         Destination.History -> t("历史", "History")
         Destination.Providers -> t("声音", "Voice")
@@ -234,6 +229,7 @@ fun PhraseVoiceRoot(
                             ),
                             audioClipsState = audioClipsState,
                             phraseActionsEditable = !lockScreenActive,
+                            showReadingControls = !lockScreenActive,
                             onTextChange = homeViewModel::updateText,
                             onQuickPhraseClick = { phrase ->
                                 homeViewModel.stop()
@@ -253,22 +249,6 @@ fun PhraseVoiceRoot(
                                 audioClipsViewModel.playClip(clip)
                             },
                             onAudioClipDelete = audioClipsViewModel::deleteClip,
-                            onSpeak = homeViewModel::speak,
-                            onStop = homeViewModel::stop,
-                            onReplay = {
-                                homeViewModel.stop()
-                                homeViewModel.speak()
-                            },
-                            modifier = modifier,
-                        )
-
-                        Destination.Home -> HomeScreen(
-                            state = homeState,
-                            display = CommunicationDisplayUiState(
-                                textScale = settingsState.settings.communicationTextScale,
-                                textTone = settingsState.settings.communicationTextTone,
-                            ),
-                            onTextChange = homeViewModel::updateText,
                             onProviderSelected = homeViewModel::selectProvider,
                             onVoiceSelected = homeViewModel::selectVoice,
                             onVoiceStyleSelected = homeViewModel::selectVoiceStyle,
@@ -281,79 +261,72 @@ fun PhraseVoiceRoot(
                             onSpeak = homeViewModel::speak,
                             onPreviewVoice = homeViewModel::previewVoice,
                             onStop = homeViewModel::stop,
+                            onReplay = {
+                                homeViewModel.stop()
+                                homeViewModel.speak()
+                            },
                             onSaveAudio = homeViewModel::saveAudio,
-                            onQuickPhraseClick = { phrase ->
-                                homeViewModel.speakPhrase(phrase.id, phrase.text)
-                            },
-                            onQuickPhraseEdit = { phrase ->
-                                destination = Destination.Library
-                                libraryViewModel.openEditDialog(phrase)
-                            },
-                            onQuickPhraseFavoriteToggle = { phrase ->
-                                libraryViewModel.toggleFavorite(phrase.id)
-                            },
-                            onQuickPhraseGroupSelected = homeViewModel::selectQuickPhraseGroup,
                             modifier = modifier,
                         )
 
-                    Destination.Library -> PhraseLibraryScreen(
-                        state = libraryViewModel.uiState.collectAsStateWithLifecycle().value,
-                        onQueryChange = libraryViewModel::updateQuery,
-                        onGroupSelected = libraryViewModel::selectGroup,
-                        onAddPhrase = libraryViewModel::openAddDialog,
-                        onEditPhrase = libraryViewModel::openEditDialog,
-                        onDeletePhrase = libraryViewModel::deletePhrase,
-                        onToggleFavorite = libraryViewModel::toggleFavorite,
-                        onTitleDraftChange = libraryViewModel::updateTitleDraft,
-                        onTextDraftChange = libraryViewModel::updateTextDraft,
-                        onFavoriteDraftChange = libraryViewModel::updateFavoriteDraft,
-                        onDismissDialog = libraryViewModel::dismissDialog,
-                        onSaveDialog = libraryViewModel::saveDialog,
-                        onSpeakPhrase = { phrase ->
-                            homeViewModel.speakPhrase(phrase.id, phrase.text)
-                        },
-                        onBuildExportJson = libraryViewModel::buildExportJson,
-                        onImportJson = libraryViewModel::importJson,
-                        onExportCompleted = libraryViewModel::markExportSuccess,
-                        onFileActionMessage = libraryViewModel::showFileActionMessage,
-                        modifier = modifier,
-                    )
+                        Destination.Library -> PhraseLibraryScreen(
+                            state = libraryViewModel.uiState.collectAsStateWithLifecycle().value,
+                            onQueryChange = libraryViewModel::updateQuery,
+                            onGroupSelected = libraryViewModel::selectGroup,
+                            onAddPhrase = libraryViewModel::openAddDialog,
+                            onEditPhrase = libraryViewModel::openEditDialog,
+                            onDeletePhrase = libraryViewModel::deletePhrase,
+                            onToggleFavorite = libraryViewModel::toggleFavorite,
+                            onTitleDraftChange = libraryViewModel::updateTitleDraft,
+                            onTextDraftChange = libraryViewModel::updateTextDraft,
+                            onFavoriteDraftChange = libraryViewModel::updateFavoriteDraft,
+                            onDismissDialog = libraryViewModel::dismissDialog,
+                            onSaveDialog = libraryViewModel::saveDialog,
+                            onSpeakPhrase = { phrase ->
+                                homeViewModel.speakPhrase(phrase.id, phrase.text)
+                            },
+                            onBuildExportJson = libraryViewModel::buildExportJson,
+                            onImportJson = libraryViewModel::importJson,
+                            onExportCompleted = libraryViewModel::markExportSuccess,
+                            onFileActionMessage = libraryViewModel::showFileActionMessage,
+                            modifier = modifier,
+                        )
 
-                    Destination.History -> HistoryScreen(
-                        state = historyViewModel.uiState.collectAsStateWithLifecycle().value,
-                        onSpeak = { item -> homeViewModel.speakText(item.text) },
-                        onSaveAsPhrase = historyViewModel::saveAsPhrase,
-                        onClear = historyViewModel::clearHistory,
-                        modifier = modifier,
-                    )
+                        Destination.History -> HistoryScreen(
+                            state = historyViewModel.uiState.collectAsStateWithLifecycle().value,
+                            onSpeak = { item -> homeViewModel.speakText(item.text) },
+                            onSaveAsPhrase = historyViewModel::saveAsPhrase,
+                            onClear = historyViewModel::clearHistory,
+                            modifier = modifier,
+                        )
 
-                    Destination.Providers -> ProviderSettingsScreen(
-                        state = providerSettingsViewModel.uiState.collectAsStateWithLifecycle().value,
-                        onProviderSelected = providerSettingsViewModel::selectProvider,
-                        onEnabledChange = providerSettingsViewModel::updateEnabled,
-                        onApiKeyChange = providerSettingsViewModel::updateApiKeyDraft,
-                        onBaseUrlChange = providerSettingsViewModel::updateBaseUrlDraft,
-                        onModelChange = providerSettingsViewModel::updateModelDraft,
-                        onVoiceChange = providerSettingsViewModel::updateVoiceDraft,
-                        onMethodChange = providerSettingsViewModel::updateMethodDraft,
-                        onHeadersChange = providerSettingsViewModel::updateHeadersDraft,
-                        onBodyChange = providerSettingsViewModel::updateBodyDraft,
-                        onResponseTypeChange = providerSettingsViewModel::updateResponseTypeDraft,
-                        onResponseFieldChange = providerSettingsViewModel::updateResponseFieldDraft,
-                        onApplyTemplate = providerSettingsViewModel::applyCustomHttpTemplate,
-                        onMimoOptimizeTextPreviewChange = providerSettingsViewModel::updateMimoOptimizeTextPreviewDraft,
-                        onMimoPromptOptimizerModelChange = providerSettingsViewModel::updateMimoPromptOptimizerModelDraft,
-                        onMimoUseStreamingChange = providerSettingsViewModel::updateMimoUseStreamingDraft,
-                        onMimoVoiceDesignPresetSelected = providerSettingsViewModel::selectMimoVoiceDesignPreset,
-                        onMimoVoiceDesignPresetNameChange = providerSettingsViewModel::updateMimoVoiceDesignPresetNameDraft,
-                        onAddMimoVoiceDesignPreset = providerSettingsViewModel::addMimoVoiceDesignPreset,
-                        onSaveMimoVoiceDesignPreset = providerSettingsViewModel::saveMimoVoiceDesignPreset,
-                        onDeleteMimoVoiceDesignPreset = providerSettingsViewModel::deleteMimoVoiceDesignPreset,
-                        onOptimizeMimoVoiceDesign = providerSettingsViewModel::optimizeMimoVoiceDesignPrompt,
-                        onSave = providerSettingsViewModel::save,
-                        onTestVoice = providerSettingsViewModel::saveAndTestVoice,
-                        modifier = modifier,
-                    )
+                        Destination.Providers -> ProviderSettingsScreen(
+                            state = providerSettingsViewModel.uiState.collectAsStateWithLifecycle().value,
+                            onProviderSelected = providerSettingsViewModel::selectProvider,
+                            onEnabledChange = providerSettingsViewModel::updateEnabled,
+                            onApiKeyChange = providerSettingsViewModel::updateApiKeyDraft,
+                            onBaseUrlChange = providerSettingsViewModel::updateBaseUrlDraft,
+                            onModelChange = providerSettingsViewModel::updateModelDraft,
+                            onVoiceChange = providerSettingsViewModel::updateVoiceDraft,
+                            onMethodChange = providerSettingsViewModel::updateMethodDraft,
+                            onHeadersChange = providerSettingsViewModel::updateHeadersDraft,
+                            onBodyChange = providerSettingsViewModel::updateBodyDraft,
+                            onResponseTypeChange = providerSettingsViewModel::updateResponseTypeDraft,
+                            onResponseFieldChange = providerSettingsViewModel::updateResponseFieldDraft,
+                            onApplyTemplate = providerSettingsViewModel::applyCustomHttpTemplate,
+                            onMimoOptimizeTextPreviewChange = providerSettingsViewModel::updateMimoOptimizeTextPreviewDraft,
+                            onMimoPromptOptimizerModelChange = providerSettingsViewModel::updateMimoPromptOptimizerModelDraft,
+                            onMimoUseStreamingChange = providerSettingsViewModel::updateMimoUseStreamingDraft,
+                            onMimoVoiceDesignPresetSelected = providerSettingsViewModel::selectMimoVoiceDesignPreset,
+                            onMimoVoiceDesignPresetNameChange = providerSettingsViewModel::updateMimoVoiceDesignPresetNameDraft,
+                            onAddMimoVoiceDesignPreset = providerSettingsViewModel::addMimoVoiceDesignPreset,
+                            onSaveMimoVoiceDesignPreset = providerSettingsViewModel::saveMimoVoiceDesignPreset,
+                            onDeleteMimoVoiceDesignPreset = providerSettingsViewModel::deleteMimoVoiceDesignPreset,
+                            onOptimizeMimoVoiceDesign = providerSettingsViewModel::optimizeMimoVoiceDesignPrompt,
+                            onSave = providerSettingsViewModel::save,
+                            onTestVoice = providerSettingsViewModel::saveAndTestVoice,
+                            modifier = modifier,
+                        )
 
                         Destination.Settings -> SettingsScreen(
                             state = settingsState,

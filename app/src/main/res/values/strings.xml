@@ -2,12 +2,12 @@
 <resources>
     <string name="app_name">PhraseVoice</string>
     <string name="quick_return_notification_title">PhraseVoice 正在待命</string>
-    <string name="quick_return_notification_text">点按返回交流页</string>
+    <string name="quick_return_notification_text">点按返回工作台</string>
     <string name="active_speech_notification_title">PhraseVoice 正在朗读</string>
     <string name="active_speech_notification_text">交流语音正在播放</string>
     <string name="active_speech_notification_chip">朗读中</string>
     <string name="quick_return_notification_action_replay">重播</string>
     <string name="quick_return_notification_action_stop">停止</string>
-    <string name="quick_return_notification_channel_name">交流快捷入口</string>
-    <string name="quick_return_notification_channel_description">从通知栏或锁屏快速回到交流页。</string>
+    <string name="quick_return_notification_channel_name">工作台快捷入口</string>
+    <string name="quick_return_notification_channel_description">从通知栏或锁屏快速回到工作台。</string>
 </resources>

@@ -492,8 +492,8 @@ private fun MimoVoiceDesignFields(
             Text(t("试听文本智能优化", "Smart Preview Text Optimization"))
             Text(
                 t(
-                    "只影响本页的 VoiceDesign 试听；正式朗读请在朗读页单独开启 MiMo 智能文本优化。",
-                    "Only affects VoiceDesign preview on this page; enable MiMo smart text optimization separately on the Read page for real reading.",
+                    "只影响本页的 VoiceDesign 试听；正式朗读请在工作台单独开启 MiMo 智能文本优化。",
+                    "Only affects VoiceDesign preview on this page; enable MiMo smart text optimization separately in Studio for real reading.",
                 ),
                 style = MaterialTheme.typography.bodySmall,
             )

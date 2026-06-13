@@ -110,7 +110,7 @@ fun HistoryScreen(
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        text = t("开始在朗读页面输入并播放吧！", "Enter text on the Read page and play it."),
+                        text = t("开始在工作台输入并播放吧！", "Enter text in Studio and play it."),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
                     )
