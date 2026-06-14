@@ -4,13 +4,13 @@ import android.app.Activity
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.History
-import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.List
+import androidx.compose.material.icons.filled.RecordVoiceOver
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.outlined.Build
 import androidx.compose.material.icons.outlined.History
-import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.List
+import androidx.compose.material.icons.outlined.RecordVoiceOver
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.Icon
 import androidx.compose.material3.AlertDialog
@@ -22,6 +22,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -37,6 +38,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.fadeIn
@@ -52,9 +54,14 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.phrasevoice.ui.theme.PhraseVoiceTheme
 import com.phrasevoice.di.AppContainer
+import com.phrasevoice.system.QuickReturnNotifier
+import com.phrasevoice.ui.audio.AudioClipsViewModel
+import com.phrasevoice.ui.communicate.CommunicationDisplayUiState
+import com.phrasevoice.ui.communicate.CommunicateScreen
+import com.phrasevoice.ui.communicate.DisplayCardUiState
 import com.phrasevoice.ui.history.HistoryScreen
 import com.phrasevoice.ui.history.HistoryViewModel
-import com.phrasevoice.ui.home.HomeScreen
+import com.phrasevoice.ui.home.HomeStatus
 import com.phrasevoice.ui.home.HomeViewModel
 import com.phrasevoice.ui.i18n.LocalAppLanguage
 import com.phrasevoice.ui.i18n.resolveAppLanguage
@@ -70,7 +77,7 @@ private enum class Destination(
     val selectedIcon: ImageVector,
     val unselectedIcon: ImageVector,
 ) {
-    Home(Icons.Filled.Home, Icons.Outlined.Home),
+    Communicate(Icons.Filled.RecordVoiceOver, Icons.Outlined.RecordVoiceOver),
     Library(Icons.Filled.List, Icons.Outlined.List),
     History(Icons.Filled.History, Icons.Outlined.History),
     Providers(Icons.Filled.Build, Icons.Outlined.Build),
@@ -80,24 +87,35 @@ private enum class Destination(
 @Composable
 private fun Destination.label(): String =
     when (this) {
-        Destination.Home -> t("朗读", "Read")
+        Destination.Communicate -> t("工作台", "Studio")
         Destination.Library -> t("常用语", "Phrases")
         Destination.History -> t("历史", "History")
-        Destination.Providers -> "Provider"
+        Destination.Providers -> t("声音", "Voice")
         Destination.Settings -> t("设置", "Settings")
     }
 
 @Composable
-fun PhraseVoiceRoot(container: AppContainer) {
+fun PhraseVoiceRoot(
+    container: AppContainer,
+    communicationRequestKey: Int = 0,
+    notificationReplayRequestKey: Int = 0,
+    notificationReplayText: String = "",
+    notificationStopRequestKey: Int = 0,
+    lockScreenActive: Boolean = false,
+) {
     val factory = remember(container) { AppViewModelFactory(container) }
     val homeViewModel: HomeViewModel = viewModel(factory = factory)
     val libraryViewModel: PhraseLibraryViewModel = viewModel(factory = factory)
     val historyViewModel: HistoryViewModel = viewModel(factory = factory)
     val settingsViewModel: SettingsViewModel = viewModel(factory = factory)
     val providerSettingsViewModel: ProviderSettingsViewModel = viewModel(factory = factory)
+    val audioClipsViewModel: AudioClipsViewModel = viewModel(factory = factory)
 
-    var destination by rememberSaveable { mutableStateOf(Destination.Home) }
+    var destination by rememberSaveable { mutableStateOf(Destination.Communicate) }
 
+    val context = LocalContext.current
+    val homeState by homeViewModel.uiState.collectAsStateWithLifecycle()
+    val audioClipsState by audioClipsViewModel.uiState.collectAsStateWithLifecycle()
     val settingsState by settingsViewModel.uiState.collectAsStateWithLifecycle()
     val isSystemDark = isSystemInDarkTheme()
     val isDarkTheme = when (settingsState.settings.themeMode) {
@@ -106,6 +124,46 @@ fun PhraseVoiceRoot(container: AppContainer) {
         else -> isSystemDark
     }
     val appLanguage = resolveAppLanguage(settingsState.settings.languageMode)
+    val visibleDestination = if (lockScreenActive) Destination.Communicate else destination
+
+    LaunchedEffect(lockScreenActive) {
+        if (lockScreenActive) {
+            destination = Destination.Communicate
+        }
+    }
+
+    LaunchedEffect(communicationRequestKey) {
+        if (communicationRequestKey > 0) {
+            destination = Destination.Communicate
+        }
+    }
+
+    LaunchedEffect(notificationReplayRequestKey) {
+        if (notificationReplayRequestKey > 0) {
+            val text = notificationReplayText.ifBlank { homeState.text }
+            if (text.isNotBlank()) {
+                destination = Destination.Communicate
+                homeViewModel.stop()
+                homeViewModel.updateText(text)
+                homeViewModel.speakText(text)
+            }
+        }
+    }
+
+    LaunchedEffect(notificationStopRequestKey) {
+        if (notificationStopRequestKey > 0) {
+            destination = Destination.Communicate
+            homeViewModel.stop()
+        }
+    }
+
+    LaunchedEffect(homeState.status, homeState.text) {
+        when (homeState.status) {
+            HomeStatus.Loading,
+            HomeStatus.Playing -> QuickReturnNotifier.showSpeaking(context, homeState.text)
+            else -> QuickReturnNotifier.show(context, homeState.text)
+        }
+    }
 
     PhraseVoiceTheme(darkTheme = isDarkTheme) {
         CompositionLocalProvider(LocalAppLanguage provides appLanguage) {
@@ -113,27 +171,29 @@ fun PhraseVoiceRoot(container: AppContainer) {
 
             Scaffold(
                 bottomBar = {
-                    NavigationBar {
-                        Destination.entries.forEach { item ->
-                            val isSelected = destination == item
-                            val label = item.label()
-                            NavigationBarItem(
-                                selected = isSelected,
-                                onClick = { destination = item },
-                                icon = {
-                                    Icon(
-                                        imageVector = if (isSelected) item.selectedIcon else item.unselectedIcon,
-                                        contentDescription = label
-                                    )
-                                },
-                                label = { Text(label) },
-                            )
+                    if (!lockScreenActive) {
+                        NavigationBar {
+                            Destination.entries.filter { it != Destination.Providers }.forEach { item ->
+                                val isSelected = destination == item
+                                val label = item.label()
+                                NavigationBarItem(
+                                    selected = isSelected,
+                                    onClick = { destination = item },
+                                    icon = {
+                                        Icon(
+                                            imageVector = if (isSelected) item.selectedIcon else item.unselectedIcon,
+                                            contentDescription = label
+                                        )
+                                    },
+                                    label = { Text(label) },
+                                )
+                            }
                         }
                     }
                 },
             ) { innerPadding ->
                 AnimatedContent(
-                    targetState = destination,
+                    targetState = visibleDestination,
                     transitionSpec = {
                         val stiffness = Spring.StiffnessLow
                         if (targetState.ordinal > initialState.ordinal) {
@@ -150,9 +210,45 @@ fun PhraseVoiceRoot(container: AppContainer) {
                 ) { targetDest ->
                     val modifier = Modifier.padding(innerPadding)
                     when (targetDest) {
-                        Destination.Home -> HomeScreen(
-                            state = homeViewModel.uiState.collectAsStateWithLifecycle().value,
+                        Destination.Communicate -> CommunicateScreen(
+                            state = homeState,
+                            displayCards = settingsState.settings.displayCards
+                                .sortedBy { it.sortOrder }
+                                .map { card ->
+                                    DisplayCardUiState(
+                                        id = card.id,
+                                        title = card.title,
+                                        body = card.body,
+                                        type = card.type,
+                                        qrContent = card.qrContent,
+                                    )
+                                },
+                            display = CommunicationDisplayUiState(
+                                textScale = settingsState.settings.communicationTextScale,
+                                textTone = settingsState.settings.communicationTextTone,
+                            ),
+                            audioClipsState = audioClipsState,
+                            phraseActionsEditable = !lockScreenActive,
+                            showReadingControls = !lockScreenActive,
                             onTextChange = homeViewModel::updateText,
+                            onQuickPhraseClick = { phrase ->
+                                homeViewModel.stop()
+                                homeViewModel.speakPhrase(phrase.id, phrase.text)
+                            },
+                            onQuickPhraseEdit = { phrase ->
+                                destination = Destination.Library
+                                libraryViewModel.openEditDialog(phrase)
+                            },
+                            onQuickPhraseFavoriteToggle = { phrase ->
+                                libraryViewModel.toggleFavorite(phrase.id)
+                            },
+                            onQuickPhraseGroupSelected = homeViewModel::selectQuickPhraseGroup,
+                            onAudioClipImport = audioClipsViewModel::importClip,
+                            onAudioClipClick = { clip ->
+                                homeViewModel.stop()
+                                audioClipsViewModel.playClip(clip)
+                            },
+                            onAudioClipDelete = audioClipsViewModel::deleteClip,
                             onProviderSelected = homeViewModel::selectProvider,
                             onVoiceSelected = homeViewModel::selectVoice,
                             onVoiceStyleSelected = homeViewModel::selectVoiceStyle,
@@ -165,71 +261,73 @@ fun PhraseVoiceRoot(container: AppContainer) {
                             onSpeak = homeViewModel::speak,
                             onPreviewVoice = homeViewModel::previewVoice,
                             onStop = homeViewModel::stop,
-                            onSaveAudio = homeViewModel::saveAudio,
-                            onQuickPhraseClick = { phrase ->
-                                homeViewModel.speakPhrase(phrase.id, phrase.text)
+                            onReplay = {
+                                homeViewModel.stop()
+                                homeViewModel.speak()
                             },
+                            onSaveAudio = homeViewModel::saveAudio,
                             modifier = modifier,
                         )
 
-                    Destination.Library -> PhraseLibraryScreen(
-                        state = libraryViewModel.uiState.collectAsStateWithLifecycle().value,
-                        onQueryChange = libraryViewModel::updateQuery,
-                        onGroupSelected = libraryViewModel::selectGroup,
-                        onAddPhrase = libraryViewModel::openAddDialog,
-                        onEditPhrase = libraryViewModel::openEditDialog,
-                        onDeletePhrase = libraryViewModel::deletePhrase,
-                        onToggleFavorite = libraryViewModel::toggleFavorite,
-                        onTitleDraftChange = libraryViewModel::updateTitleDraft,
-                        onTextDraftChange = libraryViewModel::updateTextDraft,
-                        onFavoriteDraftChange = libraryViewModel::updateFavoriteDraft,
-                        onDismissDialog = libraryViewModel::dismissDialog,
-                        onSaveDialog = libraryViewModel::saveDialog,
-                        onSpeakPhrase = { phrase ->
-                            homeViewModel.speakPhrase(phrase.id, phrase.text)
-                        },
-                        onBuildExportJson = libraryViewModel::buildExportJson,
-                        onImportJson = libraryViewModel::importJson,
-                        onExportCompleted = libraryViewModel::markExportSuccess,
-                        onFileActionMessage = libraryViewModel::showFileActionMessage,
-                        modifier = modifier,
-                    )
+                        Destination.Library -> PhraseLibraryScreen(
+                            state = libraryViewModel.uiState.collectAsStateWithLifecycle().value,
+                            onQueryChange = libraryViewModel::updateQuery,
+                            onGroupSelected = libraryViewModel::selectGroup,
+                            onAddPhrase = libraryViewModel::openAddDialog,
+                            onEditPhrase = libraryViewModel::openEditDialog,
+                            onDeletePhrase = libraryViewModel::deletePhrase,
+                            onToggleFavorite = libraryViewModel::toggleFavorite,
+                            onTitleDraftChange = libraryViewModel::updateTitleDraft,
+                            onTextDraftChange = libraryViewModel::updateTextDraft,
+                            onFavoriteDraftChange = libraryViewModel::updateFavoriteDraft,
+                            onDismissDialog = libraryViewModel::dismissDialog,
+                            onSaveDialog = libraryViewModel::saveDialog,
+                            onSpeakPhrase = { phrase ->
+                                homeViewModel.speakPhrase(phrase.id, phrase.text)
+                            },
+                            onBuildExportJson = libraryViewModel::buildExportJson,
+                            onImportJson = libraryViewModel::importJson,
+                            onExportCompleted = libraryViewModel::markExportSuccess,
+                            onFileActionMessage = libraryViewModel::showFileActionMessage,
+                            modifier = modifier,
+                        )
 
-                    Destination.History -> HistoryScreen(
-                        state = historyViewModel.uiState.collectAsStateWithLifecycle().value,
-                        onSpeak = { item -> homeViewModel.speakText(item.text) },
-                        onSaveAsPhrase = historyViewModel::saveAsPhrase,
-                        onClear = historyViewModel::clearHistory,
-                        modifier = modifier,
-                    )
+                        Destination.History -> HistoryScreen(
+                            state = historyViewModel.uiState.collectAsStateWithLifecycle().value,
+                            onSpeak = { item -> homeViewModel.speakText(item.text) },
+                            onSaveAsPhrase = historyViewModel::saveAsPhrase,
+                            onClear = historyViewModel::clearHistory,
+                            modifier = modifier,
+                        )
 
-                    Destination.Providers -> ProviderSettingsScreen(
-                        state = providerSettingsViewModel.uiState.collectAsStateWithLifecycle().value,
-                        onProviderSelected = providerSettingsViewModel::selectProvider,
-                        onEnabledChange = providerSettingsViewModel::updateEnabled,
-                        onApiKeyChange = providerSettingsViewModel::updateApiKeyDraft,
-                        onBaseUrlChange = providerSettingsViewModel::updateBaseUrlDraft,
-                        onModelChange = providerSettingsViewModel::updateModelDraft,
-                        onVoiceChange = providerSettingsViewModel::updateVoiceDraft,
-                        onMethodChange = providerSettingsViewModel::updateMethodDraft,
-                        onHeadersChange = providerSettingsViewModel::updateHeadersDraft,
-                        onBodyChange = providerSettingsViewModel::updateBodyDraft,
-                        onResponseTypeChange = providerSettingsViewModel::updateResponseTypeDraft,
-                        onResponseFieldChange = providerSettingsViewModel::updateResponseFieldDraft,
-                        onApplyTemplate = providerSettingsViewModel::applyCustomHttpTemplate,
-                        onMimoOptimizeTextPreviewChange = providerSettingsViewModel::updateMimoOptimizeTextPreviewDraft,
-                        onMimoPromptOptimizerModelChange = providerSettingsViewModel::updateMimoPromptOptimizerModelDraft,
-                        onMimoUseStreamingChange = providerSettingsViewModel::updateMimoUseStreamingDraft,
-                        onMimoVoiceDesignPresetSelected = providerSettingsViewModel::selectMimoVoiceDesignPreset,
-                        onMimoVoiceDesignPresetNameChange = providerSettingsViewModel::updateMimoVoiceDesignPresetNameDraft,
-                        onAddMimoVoiceDesignPreset = providerSettingsViewModel::addMimoVoiceDesignPreset,
-                        onSaveMimoVoiceDesignPreset = providerSettingsViewModel::saveMimoVoiceDesignPreset,
-                        onDeleteMimoVoiceDesignPreset = providerSettingsViewModel::deleteMimoVoiceDesignPreset,
-                        onOptimizeMimoVoiceDesign = providerSettingsViewModel::optimizeMimoVoiceDesignPrompt,
-                        onSave = providerSettingsViewModel::save,
-                        onTestVoice = providerSettingsViewModel::saveAndTestVoice,
-                        modifier = modifier,
-                    )
+                        Destination.Providers -> ProviderSettingsScreen(
+                            state = providerSettingsViewModel.uiState.collectAsStateWithLifecycle().value,
+                            onProviderSelected = providerSettingsViewModel::selectProvider,
+                            onEnabledChange = providerSettingsViewModel::updateEnabled,
+                            onApiKeyChange = providerSettingsViewModel::updateApiKeyDraft,
+                            onBaseUrlChange = providerSettingsViewModel::updateBaseUrlDraft,
+                            onModelChange = providerSettingsViewModel::updateModelDraft,
+                            onVoiceChange = providerSettingsViewModel::updateVoiceDraft,
+                            onMethodChange = providerSettingsViewModel::updateMethodDraft,
+                            onHeadersChange = providerSettingsViewModel::updateHeadersDraft,
+                            onBodyChange = providerSettingsViewModel::updateBodyDraft,
+                            onResponseTypeChange = providerSettingsViewModel::updateResponseTypeDraft,
+                            onResponseFieldChange = providerSettingsViewModel::updateResponseFieldDraft,
+                            onApplyTemplate = providerSettingsViewModel::applyCustomHttpTemplate,
+                            onMimoOptimizeTextPreviewChange = providerSettingsViewModel::updateMimoOptimizeTextPreviewDraft,
+                            onMimoPromptOptimizerModelChange = providerSettingsViewModel::updateMimoPromptOptimizerModelDraft,
+                            onMimoUseStreamingChange = providerSettingsViewModel::updateMimoUseStreamingDraft,
+                            onMimoVoiceDesignPresetSelected = providerSettingsViewModel::selectMimoVoiceDesignPreset,
+                            onMimoVoiceDesignPresetNameChange = providerSettingsViewModel::updateMimoVoiceDesignPresetNameDraft,
+                            onAddMimoVoiceDesignPreset = providerSettingsViewModel::addMimoVoiceDesignPreset,
+                            onSaveMimoVoiceDesignPreset = providerSettingsViewModel::saveMimoVoiceDesignPreset,
+                            onDeleteMimoVoiceDesignPreset = providerSettingsViewModel::deleteMimoVoiceDesignPreset,
+                            onOptimizeMimoVoiceDesign = providerSettingsViewModel::optimizeMimoVoiceDesignPrompt,
+                            onSave = providerSettingsViewModel::save,
+                            onTestVoice = providerSettingsViewModel::saveAndTestVoice,
+                            onBack = { destination = Destination.Settings },
+                            modifier = modifier,
+                        )
 
                         Destination.Settings -> SettingsScreen(
                             state = settingsState,
@@ -239,6 +337,9 @@ fun PhraseVoiceRoot(container: AppContainer) {
                             onVolumeChange = settingsViewModel::updateDefaultVolume,
                             onAutoSaveHistoryChange = settingsViewModel::updateAutoSaveHistory,
                             onKeepAudioCacheChange = settingsViewModel::updateKeepAudioCache,
+                            onCloudFallbackToSystemTtsChange = settingsViewModel::updateCloudFallbackToSystemTts,
+                            onImportOfflineVoiceModel = settingsViewModel::importOfflineVoiceModel,
+                            onDeleteOfflineVoiceModel = settingsViewModel::deleteOfflineVoiceModel,
                             onClearAudioCache = settingsViewModel::clearAudioCache,
                             onClearDebugLogs = settingsViewModel::clearDebugLogs,
                             onDebugLoggingEnabledChange = settingsViewModel::updateDebugLoggingEnabled,
@@ -246,6 +347,24 @@ fun PhraseVoiceRoot(container: AppContainer) {
                             onRefreshAudioCache = settingsViewModel::refreshAudioCacheInfo,
                             onThemeModeChange = settingsViewModel::updateThemeMode,
                             onLanguageModeChange = settingsViewModel::updateLanguageMode,
+                            onCommunicationTextScaleChange = settingsViewModel::updateCommunicationTextScale,
+                            onCommunicationTextToneChange = settingsViewModel::updateCommunicationTextTone,
+                            onLockScreenCommunicationEnabledChange = settingsViewModel::updateLockScreenCommunicationEnabled,
+                            onAddDisplayCard = settingsViewModel::openAddDisplayCardDialog,
+                            onEditDisplayCard = settingsViewModel::openEditDisplayCardDialog,
+                            onDeleteDisplayCard = settingsViewModel::deleteDisplayCard,
+                            onMoveDisplayCard = settingsViewModel::moveDisplayCard,
+                            onDisplayCardTitleDraftChange = settingsViewModel::updateDisplayCardTitleDraft,
+                            onDisplayCardBodyDraftChange = settingsViewModel::updateDisplayCardBodyDraft,
+                            onDisplayCardTypeDraftChange = settingsViewModel::updateDisplayCardTypeDraft,
+                            onDisplayCardQrContentDraftChange = settingsViewModel::updateDisplayCardQrContentDraft,
+                            onDismissDisplayCardDialog = settingsViewModel::dismissDisplayCardDialog,
+                            onSaveDisplayCardDialog = settingsViewModel::saveDisplayCardDialog,
+                            onBuildDisplayCardsExportJson = settingsViewModel::buildDisplayCardsExportJson,
+                            onImportDisplayCardsJson = settingsViewModel::importDisplayCardsJson,
+                            onDisplayCardsExportCompleted = settingsViewModel::markDisplayCardsExportSuccess,
+                            onDisplayCardFileActionMessage = settingsViewModel::showDisplayCardFileActionMessage,
+                            onNavigateToProviders = { destination = Destination.Providers },
                             modifier = modifier,
                         )
                     }

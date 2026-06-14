@@ -1,5 +1,9 @@
 package com.phrasevoice.ui.history
 
+import android.content.Context
+import android.content.ClipboardManager
+import android.content.ClipData
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
@@ -21,6 +25,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.BookmarkAdd
 import androidx.compose.material.icons.outlined.DeleteSweep
 import androidx.compose.material.icons.outlined.PlayArrow
+import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -110,7 +115,7 @@ fun HistoryScreen(
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        text = t("开始在朗读页面输入并播放吧！", "Enter text on the Read page and play it."),
+                        text = t("开始在工作台输入并播放吧！", "Enter text in Studio and play it."),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
                     )
@@ -157,6 +162,7 @@ private fun HistoryRow(
     onSpeak: () -> Unit,
     onSaveAsPhrase: () -> Unit,
 ) {
+    val context = LocalContext.current
     Card(
         onClick = onSpeak,
         shape = RoundedCornerShape(16.dp),
@@ -190,6 +196,18 @@ private fun HistoryRow(
                     text = java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault()).format(java.util.Date(item.createdAt)),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                )
+            }
+
+            IconButton(onClick = {
+                val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                val clip = ClipData.newPlainText("Copied Voice Text", item.text)
+                clipboard.setPrimaryClip(clip)
+            }) {
+                Icon(
+                    imageVector = Icons.Outlined.ContentCopy,
+                    contentDescription = t("复制文本", "Copy Text"),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
                 )
             }
 

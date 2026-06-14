@@ -5,6 +5,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
@@ -12,7 +14,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material3.IconButton
 import androidx.compose.material.icons.outlined.Cloud
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.PhoneAndroid
@@ -95,6 +99,7 @@ fun ProviderSettingsScreen(
     onOptimizeMimoVoiceDesign: () -> Unit,
     onSave: () -> Unit,
     onTestVoice: () -> Unit,
+    onBack: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     val selectedHealth = providerHealthForDraft(
@@ -114,9 +119,17 @@ fun ProviderSettingsScreen(
     ) {
         Row(
             modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
+            if (onBack != null) {
+                IconButton(onClick = onBack) {
+                    Icon(
+                        imageVector = Icons.Outlined.ArrowBack,
+                        contentDescription = t("返回", "Back")
+                    )
+                }
+                Spacer(modifier = Modifier.width(8.dp))
+            }
             Text(
                 text = "Provider",
                 style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.ExtraBold),
@@ -492,8 +505,8 @@ private fun MimoVoiceDesignFields(
             Text(t("试听文本智能优化", "Smart Preview Text Optimization"))
             Text(
                 t(
-                    "只影响本页的 VoiceDesign 试听；正式朗读请在朗读页单独开启 MiMo 智能文本优化。",
-                    "Only affects VoiceDesign preview on this page; enable MiMo smart text optimization separately on the Read page for real reading.",
+                    "只影响本页的 VoiceDesign 试听；正式朗读请在工作台单独开启 MiMo 智能文本优化。",
+                    "Only affects VoiceDesign preview on this page; enable MiMo smart text optimization separately in Studio for real reading.",
                 ),
                 style = MaterialTheme.typography.bodySmall,
             )

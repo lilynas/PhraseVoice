@@ -2,8 +2,10 @@ package com.phrasevoice.di
 
 import android.content.Context
 import com.phrasevoice.data.local.AudioFileStore
+import com.phrasevoice.data.local.OfflineVoiceModelStore
 import com.phrasevoice.data.local.phraseVoiceDataStore
 import com.phrasevoice.data.repository.HistoryRepository
+import com.phrasevoice.data.repository.AudioClipRepository
 import com.phrasevoice.data.repository.PhraseRepository
 import com.phrasevoice.data.repository.ProviderConfigRepository
 import com.phrasevoice.data.repository.SettingsRepository
@@ -22,6 +24,8 @@ class AppContainer(context: Context) {
     val settingsRepository = SettingsRepository(dataStore)
     val providerConfigRepository = ProviderConfigRepository(dataStore, apiKeyCipher)
     val audioFileStore = AudioFileStore(applicationContext)
+    val offlineVoiceModelStore = OfflineVoiceModelStore(applicationContext)
+    val audioClipRepository = AudioClipRepository(dataStore, audioFileStore)
     val systemTtsProvider = AndroidSystemTtsProvider(applicationContext)
     val cloudTtsService = CloudTtsService(audioFileStore)
     val audioPlaybackController = AudioPlaybackController(applicationContext)

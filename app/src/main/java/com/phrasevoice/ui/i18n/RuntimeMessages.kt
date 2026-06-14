@@ -87,8 +87,8 @@ fun localizedProviderHealthDescription(
             "$providerName is ready. Save and test when you want to confirm the voice.",
         )
         ProviderHealthStatus.Disabled -> t(
-            "打开开关并保存后，$providerName 才会出现在朗读流程里。",
-            "Turn it on and save before using $providerName on the Read page.",
+            "打开开关并保存后，$providerName 才会出现在工作台里。",
+            "Turn it on and save before using $providerName in Studio.",
         )
         ProviderHealthStatus.MissingApiKey -> t(
             "请填写并保存 API Key，然后再试听 $providerName。",
