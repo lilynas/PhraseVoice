@@ -179,7 +179,7 @@ private fun VoiceWaveIndicator(
     }
 }
 
-@OptIn(ExperimentalLayoutApi::class)
+@OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
 @Composable
 fun CommunicateScreen(
     state: HomeUiState,
