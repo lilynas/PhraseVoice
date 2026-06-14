@@ -30,6 +30,7 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -745,8 +746,9 @@ private fun CommunicateActionRow(
             enabled = isPlaying || (canRunTts && hasText),
             shape = RoundedCornerShape(16.dp),
             modifier = Modifier
-                .weight(1.35f)
+                .weight(1.2f)
                 .height(54.dp),
+            contentPadding = PaddingValues(horizontal = 8.dp),
             colors = if (isPlaying) {
                 ButtonDefaults.buttonColors(
                     containerColor = MaterialTheme.colorScheme.errorContainer,
@@ -762,15 +764,19 @@ private fun CommunicateActionRow(
             Icon(
                 imageVector = if (isPlaying) Icons.Outlined.Stop else Icons.Outlined.PlayArrow,
                 contentDescription = null,
-                modifier = Modifier.padding(end = 8.dp),
+                modifier = Modifier.size(20.dp),
             )
+            Spacer(modifier = Modifier.width(4.dp))
             Text(
                 text = when {
                     isPlaying -> t("停止", "Stop")
                     status == HomeStatus.Loading -> t("准备中", "Preparing")
                     else -> t("朗读", "Speak")
                 },
+                fontSize = 13.sp,
                 fontWeight = FontWeight.Bold,
+                maxLines = 1,
+                overflow = TextOverflow.Clip,
             )
         }
 
@@ -782,13 +788,21 @@ private fun CommunicateActionRow(
             modifier = Modifier
                 .weight(1f)
                 .height(54.dp),
+            contentPadding = PaddingValues(horizontal = 8.dp),
         ) {
             Icon(
                 imageVector = Icons.Outlined.Replay,
                 contentDescription = null,
-                modifier = Modifier.padding(end = 8.dp),
+                modifier = Modifier.size(20.dp),
             )
-            Text(t("重播", "Replay"), fontWeight = FontWeight.SemiBold)
+            Spacer(modifier = Modifier.width(4.dp))
+            Text(
+                text = t("重播", "Replay"),
+                fontSize = 13.sp,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Clip,
+            )
         }
 
         OutlinedButton(
@@ -797,16 +811,23 @@ private fun CommunicateActionRow(
             shape = RoundedCornerShape(16.dp),
             border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
             modifier = Modifier
-                .weight(0.82f)
+                .weight(1f)
                 .height(54.dp),
-            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
+            contentPadding = PaddingValues(horizontal = 8.dp),
         ) {
             Icon(
                 imageVector = Icons.Outlined.Fullscreen,
                 contentDescription = null,
-                modifier = Modifier.padding(end = 6.dp),
+                modifier = Modifier.size(20.dp),
             )
-            Text(t("全屏", "Full"), fontWeight = FontWeight.SemiBold)
+            Spacer(modifier = Modifier.width(4.dp))
+            Text(
+                text = t("全屏", "Full"),
+                fontSize = 13.sp,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Clip,
+            )
         }
 
         OutlinedButton(
