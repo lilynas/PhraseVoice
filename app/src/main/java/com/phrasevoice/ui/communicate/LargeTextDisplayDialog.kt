@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -67,6 +68,7 @@ fun LargeTextDisplayDialog(
             Column(
                 modifier = Modifier
                     .fillMaxSize()
+                    .systemBarsPadding()
                     .padding(24.dp),
                 verticalArrangement = Arrangement.spacedBy(18.dp),
             ) {
@@ -89,7 +91,7 @@ fun LargeTextDisplayDialog(
                         .weight(1f)
                         .fillMaxWidth()
                         .verticalScroll(rememberScrollState()),
-                    contentAlignment = Alignment.Center,
+                    contentAlignment = Alignment(horizontalBias = 0f, verticalBias = -0.15f),
                 ) {
                     Text(
                         text = text.ifBlank { t("点按短语或输入文字", "Tap a phrase or enter text") },
