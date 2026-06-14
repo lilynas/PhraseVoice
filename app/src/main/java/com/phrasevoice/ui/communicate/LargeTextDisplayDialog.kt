@@ -30,6 +30,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.BiasAlignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
@@ -91,7 +92,7 @@ fun LargeTextDisplayDialog(
                         .weight(1f)
                         .fillMaxWidth()
                         .verticalScroll(rememberScrollState()),
-                    contentAlignment = Alignment(horizontalBias = 0f, verticalBias = -0.15f),
+                    contentAlignment = BiasAlignment(horizontalBias = 0f, verticalBias = -0.15f),
                 ) {
                     Text(
                         text = text.ifBlank { t("点按短语或输入文字", "Tap a phrase or enter text") },
