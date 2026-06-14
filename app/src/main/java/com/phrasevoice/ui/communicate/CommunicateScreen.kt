@@ -60,11 +60,16 @@ import androidx.compose.material.icons.outlined.Stop
 import androidx.compose.material.icons.outlined.Audiotrack
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.FileUpload
+import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.material3.TabRow
+import androidx.compose.material3.Tab
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.FilterChip
@@ -221,6 +226,8 @@ fun CommunicateScreen(
     var fullScreenQrCard by remember { mutableStateOf<DisplayCardUiState?>(null) }
     var showLargeText by remember { mutableStateOf(false) }
     var phraseAction by remember { mutableStateOf<Phrase?>(null) }
+    var selectedTab by remember { mutableStateOf(0) }
+    var showTuningSheet by remember { mutableStateOf(false) }
     val audioImportLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument(),
     ) { uri: Uri? ->
@@ -298,6 +305,7 @@ fun CommunicateScreen(
                         onStop = onStop,
                         onReplay = onReplay,
                         onShowLargeText = { showLargeText = true },
+                        onTuneClick = { showTuningSheet = true },
                     )
                     CommunicateStatusMessage(
                         state = state,
@@ -305,14 +313,6 @@ fun CommunicateScreen(
                         androidTtsUnavailable = androidTtsUnavailable,
                         selectedProviderUnavailable = selectedProviderUnavailable,
                     )
-                    if (showReadingControls) {
-                        TextToolsPanel(
-                            state = state,
-                            enabled = hasText,
-                            onTextOptimizationSelected = onTextOptimizationSelected,
-                            onMimoSmartTextOptimizationChange = onMimoSmartTextOptimizationChange,
-                        )
-                    }
                 }
 
                 Column(
@@ -322,40 +322,18 @@ fun CommunicateScreen(
                         .verticalScroll(rememberScrollState()),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    if (showReadingControls) {
-                        ReadingControlsPanel(
-                            state = state,
-                            canRunTts = canRunTts,
-                            hasText = hasText,
-                            context = context,
-                            shareTitle = shareTitle,
-                            onProviderSelected = onProviderSelected,
-                            onVoiceSelected = onVoiceSelected,
-                            onVoiceStyleSelected = onVoiceStyleSelected,
-                            onSpeedChange = onSpeedChange,
-                            onPitchChange = onPitchChange,
-                            onVolumeChange = onVolumeChange,
-                            onReadingPresetSelected = onReadingPresetSelected,
-                            onPreviewVoice = onPreviewVoice,
-                            onSaveAudio = onSaveAudio,
-                        )
-                    }
-                    QuickPhrasePanel(
+                    StudioTabsPanel(
+                        selectedTab = selectedTab,
+                        onTabSelected = { selectedTab = it },
                         state = state,
+                        displayCards = displayCards,
+                        audioClipsState = audioClipsState,
                         compactCards = true,
                         onQuickPhraseClick = onQuickPhraseClick,
                         onQuickPhraseLongClick = { phraseAction = it },
                         onQuickPhraseGroupSelected = onQuickPhraseGroupSelected,
-                    )
-                    DisplayCardsPanel(
-                        cards = displayCards,
-                        compactCards = true,
                         onDisplayCardClick = { selectedDisplayCard = it },
-                    )
-                    AudioClipsPanel(
-                        state = audioClipsState,
-                        compactCards = true,
-                        onImportClick = { audioImportLauncher.launch(arrayOf("audio/*")) },
+                        onImportAudioClick = { audioImportLauncher.launch(arrayOf("audio/*")) },
                         onAudioClipClick = onAudioClipClick,
                         onAudioClipDelete = onAudioClipDelete,
                     )
@@ -389,6 +367,7 @@ fun CommunicateScreen(
                     onStop = onStop,
                     onReplay = onReplay,
                     onShowLargeText = { showLargeText = true },
+                    onTuneClick = { showTuningSheet = true },
                 )
                 CommunicateStatusMessage(
                     state = state,
@@ -396,6 +375,41 @@ fun CommunicateScreen(
                     androidTtsUnavailable = androidTtsUnavailable,
                     selectedProviderUnavailable = selectedProviderUnavailable,
                 )
+                StudioTabsPanel(
+                    selectedTab = selectedTab,
+                    onTabSelected = { selectedTab = it },
+                    state = state,
+                    displayCards = displayCards,
+                    audioClipsState = audioClipsState,
+                    compactCards = false,
+                    onQuickPhraseClick = onQuickPhraseClick,
+                    onQuickPhraseLongClick = { phraseAction = it },
+                    onQuickPhraseGroupSelected = onQuickPhraseGroupSelected,
+                    onDisplayCardClick = { selectedDisplayCard = it },
+                    onImportAudioClick = { audioImportLauncher.launch(arrayOf("audio/*")) },
+                    onAudioClipClick = onAudioClipClick,
+                    onAudioClipDelete = onAudioClipDelete,
+                )
+            }
+        }
+    }
+
+    if (showTuningSheet && showReadingControls) {
+        ModalBottomSheet(
+            onDismissRequest = { showTuningSheet = false },
+            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+            shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+            containerColor = MaterialTheme.colorScheme.surface,
+            contentColor = MaterialTheme.colorScheme.onSurface,
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = 20.dp, vertical = 10.dp)
+                    .padding(bottom = 28.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
                 if (showReadingControls) {
                     TextToolsPanel(
                         state = state,
@@ -420,25 +434,6 @@ fun CommunicateScreen(
                         onSaveAudio = onSaveAudio,
                     )
                 }
-                QuickPhrasePanel(
-                    state = state,
-                    compactCards = false,
-                    onQuickPhraseClick = onQuickPhraseClick,
-                    onQuickPhraseLongClick = { phraseAction = it },
-                    onQuickPhraseGroupSelected = onQuickPhraseGroupSelected,
-                )
-                DisplayCardsPanel(
-                    cards = displayCards,
-                    compactCards = false,
-                    onDisplayCardClick = { selectedDisplayCard = it },
-                )
-                AudioClipsPanel(
-                    state = audioClipsState,
-                    compactCards = false,
-                    onImportClick = { audioImportLauncher.launch(arrayOf("audio/*")) },
-                    onAudioClipClick = onAudioClipClick,
-                    onAudioClipDelete = onAudioClipDelete,
-                )
             }
         }
     }
@@ -738,6 +733,7 @@ private fun CommunicateActionRow(
     onStop: () -> Unit,
     onReplay: () -> Unit,
     onShowLargeText: () -> Unit,
+    onTuneClick: () -> Unit,
 ) {
     val isPlaying = status == HomeStatus.Playing
     Row(
@@ -811,6 +807,21 @@ private fun CommunicateActionRow(
                 modifier = Modifier.padding(end = 6.dp),
             )
             Text(t("全屏", "Full"), fontWeight = FontWeight.SemiBold)
+        }
+
+        OutlinedButton(
+            onClick = onTuneClick,
+            shape = RoundedCornerShape(16.dp),
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+            modifier = Modifier
+                .size(height = 54.dp, width = 54.dp),
+            contentPadding = PaddingValues(0.dp),
+        ) {
+            Icon(
+                imageVector = Icons.Outlined.Tune,
+                contentDescription = t("语音设置", "Voice Settings"),
+                tint = MaterialTheme.colorScheme.primary,
+            )
         }
     }
 }
@@ -1973,6 +1984,82 @@ private fun QuickPhraseButton(
                 overflow = TextOverflow.Ellipsis,
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurface,
+            )
+        }
+    }
+}
+
+@Composable
+private fun StudioTabsPanel(
+    selectedTab: Int,
+    onTabSelected: (Int) -> Unit,
+    state: HomeUiState,
+    displayCards: List<DisplayCardUiState>,
+    audioClipsState: AudioClipsUiState,
+    compactCards: Boolean,
+    onQuickPhraseClick: (Phrase) -> Unit,
+    onQuickPhraseLongClick: (Phrase) -> Unit,
+    onQuickPhraseGroupSelected: (String?) -> Unit,
+    onDisplayCardClick: (DisplayCardUiState) -> Unit,
+    onImportAudioClick: () -> Unit,
+    onAudioClipClick: (AudioClip) -> Unit,
+    onAudioClipDelete: (String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val tabs = listOf(
+        t("快捷短语", "Phrases"),
+        t("展示卡片", "Display Cards"),
+        t("快捷音频", "Audio Clips")
+    )
+
+    Column(
+        modifier = modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        TabRow(
+            selectedTabIndex = selectedTab,
+            containerColor = Color.Transparent,
+            contentColor = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            tabs.forEachIndexed { index, title ->
+                Tab(
+                    selected = selectedTab == index,
+                    onClick = { onTabSelected(index) },
+                    text = {
+                        Text(
+                            text = title,
+                            fontWeight = if (selectedTab == index) FontWeight.Bold else FontWeight.Medium,
+                            fontSize = 15.sp,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(2.dp))
+
+        when (selectedTab) {
+            0 -> QuickPhrasePanel(
+                state = state,
+                compactCards = compactCards,
+                onQuickPhraseClick = onQuickPhraseClick,
+                onQuickPhraseLongClick = onQuickPhraseLongClick,
+                onQuickPhraseGroupSelected = onQuickPhraseGroupSelected,
+            )
+            1 -> DisplayCardsPanel(
+                cards = displayCards,
+                compactCards = compactCards,
+                onDisplayCardClick = onDisplayCardClick,
+            )
+            2 -> AudioClipsPanel(
+                state = audioClipsState,
+                compactCards = compactCards,
+                onImportClick = onImportAudioClick,
+                onAudioClipClick = onAudioClipClick,
+                onAudioClipDelete = onAudioClipDelete,
             )
         }
     }

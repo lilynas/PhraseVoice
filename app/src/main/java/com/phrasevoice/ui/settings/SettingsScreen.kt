@@ -50,6 +50,12 @@ import androidx.compose.material.icons.outlined.FileUpload
 import androidx.compose.material.icons.outlined.LightMode
 import androidx.compose.material.icons.outlined.QrCode2
 import androidx.compose.material.icons.outlined.Translate
+import androidx.compose.material.icons.outlined.ChevronRight
+import androidx.compose.material.icons.outlined.ArrowBack
+import androidx.compose.material.icons.outlined.Tune
+import androidx.compose.material.icons.outlined.Cloud
+import androidx.compose.material.icons.outlined.Build
+import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -140,6 +146,7 @@ fun SettingsScreen(
     onImportDisplayCardsJson: (String) -> Unit,
     onDisplayCardsExportCompleted: () -> Unit,
     onDisplayCardFileActionMessage: (String) -> Unit,
+    onNavigateToProviders: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     LaunchedEffect(Unit) {
@@ -147,6 +154,7 @@ fun SettingsScreen(
     }
 
     var showAboutDialog by remember { mutableStateOf(false) }
+    var subScreen by remember { mutableStateOf(SettingsSubScreen.Main) }
 
     if (showAboutDialog) {
         AboutDialog(onDismiss = { showAboutDialog = false })
@@ -202,223 +210,385 @@ fun SettingsScreen(
     }
 
     val settings = state.settings
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp),
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(
-                text = t("设置", "Settings"),
-                style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold)
-            )
-            LanguageSwitcher(
-                languageMode = settings.languageMode,
-                onLanguageModeChange = onLanguageModeChange,
-            )
-        }
 
-        SettingsCard {
-            Text(
-                text = t("主题设置", "Theme"),
-                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                color = MaterialTheme.colorScheme.primary
-            )
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
+    when (subScreen) {
+        SettingsSubScreen.Main -> {
+            Column(
+                modifier = modifier
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState())
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp),
             ) {
-                listOf(
-                    Triple("system", t("默认", "System"), Icons.Outlined.BrightnessAuto),
-                    Triple("light", t("白色", "Light"), Icons.Outlined.LightMode),
-                    Triple("dark", t("黑色", "Dark"), Icons.Outlined.DarkMode)
-                ).forEach { (mode, label, icon) ->
-                    val isSelected = settings.themeMode == mode
-                    FilterChip(
-                        selected = isSelected,
-                        onClick = { onThemeModeChange(mode) },
-                        label = { Text(label) },
-                        leadingIcon = {
-                            Icon(
-                                imageVector = icon,
-                                contentDescription = null,
-                                modifier = Modifier.size(16.dp)
-                            )
-                        },
-                        modifier = Modifier.weight(1f)
-                    )
-                }
-            }
-        }
-
-        CommunicationDisplaySettingsCard(
-            textScale = settings.communicationTextScale,
-            textTone = settings.communicationTextTone,
-            onTextScaleChange = onCommunicationTextScaleChange,
-            onTextToneChange = onCommunicationTextToneChange,
-        )
-
-        SettingsCard {
-            Text(
-                text = t("锁屏交流", "Lock Screen Talk"),
-                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                color = MaterialTheme.colorScheme.primary,
-            )
-            SwitchSetting(
-                label = t("锁屏交流模式", "Lock Screen Talk"),
-                value = settings.lockScreenCommunicationEnabled,
-                onChange = onLockScreenCommunicationEnabledChange,
-            )
-        }
-
-        SettingsCard {
-            Text(
-                text = t("默认 Provider", "Default Provider"),
-                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                color = MaterialTheme.colorScheme.primary
-            )
-            DefaultProviderDropdown(
-                providers = state.providers,
-                selectedProviderId = settings.defaultProviderId,
-                onDefaultProviderChange = onDefaultProviderChange,
-            )
-        }
-
-        SettingsCard {
-            Text(
-                text = t("发音属性默认值", "Default Voice Properties"),
-                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                color = MaterialTheme.colorScheme.primary
-            )
-            SliderSetting(
-                label = t("默认语速", "Default Speed"),
-                value = settings.defaultSpeed,
-                range = 0.5f..2.0f,
-                startIcon = Icons.Outlined.DirectionsWalk,
-                endIcon = Icons.Outlined.DirectionsRun,
-                onChange = onSpeedChange
-            )
-            Spacer(modifier = Modifier.height(10.dp))
-            SliderSetting(
-                label = t("默认音调", "Default Pitch"),
-                value = settings.defaultPitch,
-                range = 0.5f..2.0f,
-                startIcon = Icons.Outlined.ArrowDownward,
-                endIcon = Icons.Outlined.ArrowUpward,
-                onChange = onPitchChange
-            )
-            Spacer(modifier = Modifier.height(10.dp))
-            SliderSetting(
-                label = t("默认音量", "Default Volume"),
-                value = settings.defaultVolume,
-                range = 0.0f..1.0f,
-                startIcon = Icons.AutoMirrored.Outlined.VolumeMute,
-                endIcon = Icons.AutoMirrored.Outlined.VolumeUp,
-                onChange = onVolumeChange
-            )
-        }
-
-        SettingsCard {
-            Text(
-                text = t("存储与历史", "Storage & History"),
-                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                color = MaterialTheme.colorScheme.primary
-            )
-            SwitchSetting(t("自动保存历史", "Auto-save History"), settings.autoSaveHistory, onAutoSaveHistoryChange)
-            SwitchSetting(t("保留音频缓存", "Keep Audio Cache"), settings.keepAudioCache, onKeepAudioCacheChange)
-        }
-
-        OfflineVoiceSettingsCard(
-            fallbackEnabled = settings.cloudFallbackToSystemTts,
-            models = settings.offlineVoiceModels,
-            message = state.offlineVoiceMessage,
-            onFallbackChange = onCloudFallbackToSystemTtsChange,
-            onImportClick = {
-                offlineVoiceImportLauncher.launch(
-                    arrayOf(
-                        "application/octet-stream",
-                        "application/zip",
-                        "application/x-tar",
-                        "application/x-bzip2",
-                        "application/x-bzip-compressed-tar",
-                        "*/*",
-                    ),
-                )
-            },
-            onDelete = onDeleteOfflineVoiceModel,
-        )
-
-        DisplayCardsSettingsCard(
-            cards = settings.displayCards.sortedBy { it.sortOrder },
-            fileActionMessage = state.displayCardFileActionMessage,
-            onAdd = onAddDisplayCard,
-            onEdit = onEditDisplayCard,
-            onDelete = onDeleteDisplayCard,
-            onMove = onMoveDisplayCard,
-            onImportClick = {
-                displayCardsImportLauncher.launch(arrayOf("application/json", "text/*", "*/*"))
-            },
-            onExportClick = {
-                scope.launch {
-                    runCatching { onBuildDisplayCardsExportJson() }
-                        .onSuccess { json ->
-                            pendingDisplayCardsExportJson = json
-                            displayCardsExportLauncher.launch("phrasevoice-display-cards.json")
-                        }
-                        .onFailure { throwable ->
-                            onDisplayCardFileActionMessage(
-                                "$exportCardsFailedPrefix${throwable.message ?: cannotCreateCardsFile}",
-                            )
-                        }
-                }
-            },
-        )
-
-        AudioCacheCard(
-            state = state,
-            onClearAudioCache = onClearAudioCache,
-            onRefreshAudioCache = onRefreshAudioCache,
-        )
-
-        // 关于卡片
-        SettingsCard {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable { showAboutDialog = true }
-                    .padding(vertical = 4.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
                     Text(
-                        text = t("关于 PhraseVoice", "About PhraseVoice"),
-                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                        color = MaterialTheme.colorScheme.primary
+                        text = t("设置", "Settings"),
+                        style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold)
+                    )
+                    LanguageSwitcher(
+                        languageMode = settings.languageMode,
+                        onLanguageModeChange = onLanguageModeChange,
                     )
                 }
-                Icon(
-                    imageVector = Icons.Outlined.Info,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary
+
+                // 显示与偏好
+                SettingsCard {
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        Text(
+                            text = t("显示与偏好", "Appearance & Display"),
+                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Text(
+                                text = t("主题设置", "Theme"),
+                                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Row(
+                                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                listOf(
+                                    Triple("system", t("默认", "System"), Icons.Outlined.BrightnessAuto),
+                                    Triple("light", t("白色", "Light"), Icons.Outlined.LightMode),
+                                    Triple("dark", t("黑色", "Dark"), Icons.Outlined.DarkMode)
+                                ).forEach { (mode, label, icon) ->
+                                    val isSelected = settings.themeMode == mode
+                                    FilterChip(
+                                        selected = isSelected,
+                                        onClick = { onThemeModeChange(mode) },
+                                        label = { Text(label) },
+                                        leadingIcon = {
+                                            Icon(
+                                                imageVector = icon,
+                                                contentDescription = null,
+                                                modifier = Modifier.size(16.dp)
+                                            )
+                                        },
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                }
+                            }
+                        }
+
+                        CommunicationDisplaySettingsCard(
+                            textScale = settings.communicationTextScale,
+                            textTone = settings.communicationTextTone,
+                            onTextScaleChange = onCommunicationTextScaleChange,
+                            onTextToneChange = onCommunicationTextToneChange,
+                        )
+
+                        SwitchSetting(
+                            label = t("锁屏交流模式", "Lock Screen Talk"),
+                            value = settings.lockScreenCommunicationEnabled,
+                            onChange = onLockScreenCommunicationEnabledChange,
+                        )
+                    }
+                }
+
+                // 语音引擎与参数
+                SettingsCard {
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        Text(
+                            text = t("发音与引擎", "Speech & Engine"),
+                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                            color = MaterialTheme.colorScheme.primary
+                        )
+
+                        SettingsNavigationRow(
+                            title = t("配置语音源 / API 密钥", "Configure Providers & API Keys"),
+                            subtitle = t("添加云端 TTS 引擎、填入 API 密钥与服务地址", "Configure cloud TTS engines, API keys and URLs"),
+                            icon = Icons.Outlined.Build,
+                            onClick = onNavigateToProviders
+                        )
+
+                        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Text(
+                                text = t("默认发音引擎", "Default Voice Provider"),
+                                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            DefaultProviderDropdown(
+                                providers = state.providers,
+                                selectedProviderId = settings.defaultProviderId,
+                                onDefaultProviderChange = onDefaultProviderChange,
+                            )
+                        }
+
+                        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Text(
+                                text = t("发音属性默认值", "Default Voice Properties"),
+                                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            SliderSetting(
+                                label = t("默认语速", "Default Speed"),
+                                value = settings.defaultSpeed,
+                                range = 0.5f..2.0f,
+                                startIcon = Icons.Outlined.DirectionsWalk,
+                                endIcon = Icons.Outlined.DirectionsRun,
+                                onChange = onSpeedChange
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            SliderSetting(
+                                label = t("默认音调", "Default Pitch"),
+                                value = settings.defaultPitch,
+                                range = 0.5f..2.0f,
+                                startIcon = Icons.Outlined.ArrowDownward,
+                                endIcon = Icons.Outlined.ArrowUpward,
+                                onChange = onPitchChange
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            SliderSetting(
+                                label = t("默认音量", "Default Volume"),
+                                value = settings.defaultVolume,
+                                range = 0.0f..1.0f,
+                                startIcon = Icons.AutoMirrored.Outlined.VolumeMute,
+                                endIcon = Icons.AutoMirrored.Outlined.VolumeUp,
+                                onChange = onVolumeChange
+                            )
+                        }
+                    }
+                }
+
+                // 高级配置入口
+                SettingsCard {
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Text(
+                            text = t("高级功能", "Advanced Options"),
+                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                            color = MaterialTheme.colorScheme.primary
+                        )
+
+                        SettingsNavigationRow(
+                            title = t("离线语音包管理", "Offline Voice Models"),
+                            subtitle = t(
+                                "已导入 %d 个语音包，管理云端失败时的离线兜底发音".format(settings.offlineVoiceModels.size),
+                                "Imported %d model packages for offline text-to-speech".format(settings.offlineVoiceModels.size)
+                            ),
+                            icon = Icons.Outlined.Cloud,
+                            onClick = { subScreen = SettingsSubScreen.OfflineVoice }
+                        )
+
+                        SettingsNavigationRow(
+                            title = t("展示卡片配置", "Display Cards Configuration"),
+                            subtitle = t(
+                                "已创建 %d 张展示卡片，修改和排序常用二维码".format(settings.displayCards.size),
+                                "Managed %d custom display and QR cards".format(settings.displayCards.size)
+                            ),
+                            icon = Icons.Outlined.QrCode2,
+                            onClick = { subScreen = SettingsSubScreen.DisplayCards }
+                        )
+
+                        SettingsNavigationRow(
+                            title = t("开发者调试日志", "Developer Debug Logs"),
+                            subtitle = t("查看实时运行 Log 与系统错误报告", "View runtime logs and exception reports"),
+                            icon = Icons.Outlined.Settings,
+                            onClick = { subScreen = SettingsSubScreen.DebugLogs }
+                        )
+                    }
+                }
+
+                // 存储与维护
+                SettingsCard {
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Text(
+                            text = t("存储与缓存", "Storage & Cache"),
+                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        SwitchSetting(t("自动保存历史", "Auto-save History"), settings.autoSaveHistory, onAutoSaveHistoryChange)
+                        SwitchSetting(t("保留音频缓存", "Keep Audio Cache"), settings.keepAudioCache, onKeepAudioCacheChange)
+                        
+                        Spacer(modifier = Modifier.height(4.dp))
+                        
+                        AudioCacheCard(
+                            state = state,
+                            onClearAudioCache = onClearAudioCache,
+                            onRefreshAudioCache = onRefreshAudioCache,
+                        )
+                    }
+                }
+
+                // 关于卡片
+                SettingsCard {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { showAboutDialog = true }
+                            .padding(vertical = 8.dp, horizontal = 12.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Outlined.Info,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(24.dp)
+                            )
+                            Text(
+                                text = t("关于 PhraseVoice", "About PhraseVoice"),
+                                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+                        Icon(
+                            imageVector = Icons.Outlined.ChevronRight,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                        )
+                    }
+                }
+            }
+        }
+
+        SettingsSubScreen.OfflineVoice -> {
+            Column(
+                modifier = modifier
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState())
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    IconButton(onClick = { subScreen = SettingsSubScreen.Main }) {
+                        Icon(Icons.Outlined.ArrowBack, contentDescription = t("返回", "Back"))
+                    }
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = t("离线语音包管理", "Offline Voice Models"),
+                        style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold)
+                    )
+                }
+
+                OfflineVoiceSettingsCard(
+                    fallbackEnabled = settings.cloudFallbackToSystemTts,
+                    models = settings.offlineVoiceModels,
+                    message = state.offlineVoiceMessage,
+                    onFallbackChange = onCloudFallbackToSystemTtsChange,
+                    onImportClick = {
+                        offlineVoiceImportLauncher.launch(
+                            arrayOf(
+                                "application/octet-stream",
+                                "application/zip",
+                                "application/x-tar",
+                                "application/x-bzip2",
+                                "application/x-bzip-compressed-tar",
+                                "*/*",
+                            ),
+                        )
+                    },
+                    onDelete = onDeleteOfflineVoiceModel,
                 )
             }
         }
 
-        DebugLogCard(
-            enabled = settings.debugLoggingEnabled,
-            level = settings.debugLogLevel,
-            logs = state.debugLogs,
-            onClearDebugLogs = onClearDebugLogs,
-            onEnabledChange = onDebugLoggingEnabledChange,
-            onLevelChange = onDebugLogLevelChange,
-        )
+        SettingsSubScreen.DisplayCards -> {
+            Column(
+                modifier = modifier
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState())
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    IconButton(onClick = { subScreen = SettingsSubScreen.Main }) {
+                        Icon(Icons.Outlined.ArrowBack, contentDescription = t("返回", "Back"))
+                    }
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = t("展示卡片配置", "Display Cards"),
+                        style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold)
+                    )
+                }
+
+                DisplayCardsSettingsCard(
+                    cards = settings.displayCards.sortedBy { it.sortOrder },
+                    fileActionMessage = state.displayCardFileActionMessage,
+                    onAdd = onAddDisplayCard,
+                    onEdit = onEditDisplayCard,
+                    onDelete = onDeleteDisplayCard,
+                    onMove = onMoveDisplayCard,
+                    onImportClick = {
+                        displayCardsImportLauncher.launch(arrayOf("application/json", "text/*", "*/*"))
+                    },
+                    onExportClick = {
+                        scope.launch {
+                            runCatching { onBuildDisplayCardsExportJson() }
+                                .onSuccess { json ->
+                                    pendingDisplayCardsExportJson = json
+                                    displayCardsExportLauncher.launch("phrasevoice-display-cards.json")
+                                }
+                                .onFailure { throwable ->
+                                    onDisplayCardFileActionMessage(
+                                        "$exportCardsFailedPrefix${throwable.message ?: cannotCreateCardsFile}",
+                                    )
+                                }
+                        }
+                    },
+                )
+            }
+        }
+
+        SettingsSubScreen.DebugLogs -> {
+            Column(
+                modifier = modifier
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState())
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    IconButton(onClick = { subScreen = SettingsSubScreen.Main }) {
+                        Icon(Icons.Outlined.ArrowBack, contentDescription = t("返回", "Back"))
+                    }
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = t("开发者调试日志", "Debug Logs"),
+                        style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold)
+                    )
+                }
+
+                DebugLogCard(
+                    enabled = settings.debugLoggingEnabled,
+                    level = settings.debugLogLevel,
+                    logs = state.debugLogs,
+                    onClearDebugLogs = onClearDebugLogs,
+                    onEnabledChange = onDebugLoggingEnabledChange,
+                    onLevelChange = onDebugLogLevelChange,
+                )
+            }
+        }
     }
 
     if (state.displayCardEditor.isOpen) {
@@ -1613,6 +1783,64 @@ private fun AboutLinkItem(
                 color = MaterialTheme.colorScheme.primary,
                 textDecoration = TextDecoration.Underline
             )
+        )
+    }
+}
+
+private enum class SettingsSubScreen {
+    Main,
+    OfflineVoice,
+    DisplayCards,
+    DebugLogs
+}
+
+@Composable
+private fun SettingsNavigationRow(
+    title: String,
+    subtitle: String? = null,
+    icon: ImageVector? = null,
+    onClick: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(vertical = 8.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.weight(1f)
+        ) {
+            if (icon != null) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(24.dp)
+                )
+            }
+            Column {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                if (subtitle != null) {
+                    Text(
+                        text = subtitle,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        }
+        Icon(
+            imageVector = Icons.Outlined.ChevronRight,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
         )
     }
 }

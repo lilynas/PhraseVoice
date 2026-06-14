@@ -173,7 +173,7 @@ fun PhraseVoiceRoot(
                 bottomBar = {
                     if (!lockScreenActive) {
                         NavigationBar {
-                            Destination.entries.forEach { item ->
+                            Destination.entries.filter { it != Destination.Providers }.forEach { item ->
                                 val isSelected = destination == item
                                 val label = item.label()
                                 NavigationBarItem(
@@ -325,6 +325,7 @@ fun PhraseVoiceRoot(
                             onOptimizeMimoVoiceDesign = providerSettingsViewModel::optimizeMimoVoiceDesignPrompt,
                             onSave = providerSettingsViewModel::save,
                             onTestVoice = providerSettingsViewModel::saveAndTestVoice,
+                            onBack = { destination = Destination.Settings },
                             modifier = modifier,
                         )
 
@@ -363,6 +364,7 @@ fun PhraseVoiceRoot(
                             onImportDisplayCardsJson = settingsViewModel::importDisplayCardsJson,
                             onDisplayCardsExportCompleted = settingsViewModel::markDisplayCardsExportSuccess,
                             onDisplayCardFileActionMessage = settingsViewModel::showDisplayCardFileActionMessage,
+                            onNavigateToProviders = { destination = Destination.Providers },
                             modifier = modifier,
                         )
                     }

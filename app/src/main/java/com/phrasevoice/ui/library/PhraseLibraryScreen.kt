@@ -25,7 +25,10 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.FileDownload
@@ -150,48 +153,57 @@ fun PhraseLibraryScreen(
                     color = MaterialTheme.colorScheme.onBackground
                 )
             }
-            Button(
-                onClick = onAddPhrase,
-                shape = RoundedCornerShape(16.dp)
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(Icons.Outlined.Add, contentDescription = null, modifier = Modifier.padding(end = 4.dp))
-                Text(t("新增", "Add"), fontWeight = FontWeight.Bold)
-            }
-        }
+                Button(
+                    onClick = onAddPhrase,
+                    shape = RoundedCornerShape(16.dp)
+                ) {
+                    Icon(Icons.Outlined.Add, contentDescription = null, modifier = Modifier.padding(end = 4.dp))
+                    Text(t("新增", "Add"), fontWeight = FontWeight.Bold)
+                }
 
-        // Import & Export Row
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-            OutlinedButton(
-                onClick = { importLauncher.launch(arrayOf("application/json", "text/*", "*/*")) },
-                shape = RoundedCornerShape(14.dp),
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
-                modifier = Modifier.weight(1f),
-            ) {
-                Icon(Icons.Outlined.FileUpload, contentDescription = null, modifier = Modifier.padding(end = 4.dp))
-                Text(t("导入 JSON", "Import JSON"), fontWeight = FontWeight.SemiBold)
-            }
-            OutlinedButton(
-                onClick = {
-                    scope.launch {
-                        runCatching { onBuildExportJson() }
-                            .onSuccess { json ->
-                                pendingExportJson = json
-                                exportLauncher.launch("phrasevoice-phrases.json")
-                            }
-                            .onFailure { throwable ->
-                                onFileActionMessage("$exportFailedPrefix${throwable.message ?: cannotCreateFile}")
-                            }
+                var menuExpanded by remember { mutableStateOf(false) }
+                Box {
+                    IconButton(onClick = { menuExpanded = true }) {
+                        Icon(
+                            imageVector = Icons.Default.MoreVert,
+                            contentDescription = t("更多选项", "More Options")
+                        )
                     }
-                },
-                shape = RoundedCornerShape(14.dp),
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
-                modifier = Modifier.weight(1f),
-            ) {
-                Icon(Icons.Outlined.FileDownload, contentDescription = null, modifier = Modifier.padding(end = 4.dp))
-                Text(t("导出 JSON", "Export JSON"), fontWeight = FontWeight.SemiBold)
+                    DropdownMenu(
+                        expanded = menuExpanded,
+                        onDismissRequest = { menuExpanded = false }
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text(t("导入 JSON", "Import JSON")) },
+                            leadingIcon = { Icon(Icons.Outlined.FileUpload, contentDescription = null) },
+                            onClick = {
+                                menuExpanded = false
+                                importLauncher.launch(arrayOf("application/json", "text/*", "*/*"))
+                            }
+                        )
+                        DropdownMenuItem(
+                            text = { Text(t("导出 JSON", "Export JSON")) },
+                            leadingIcon = { Icon(Icons.Outlined.FileDownload, contentDescription = null) },
+                            onClick = {
+                                menuExpanded = false
+                                scope.launch {
+                                    runCatching { onBuildExportJson() }
+                                        .onSuccess { json ->
+                                            pendingExportJson = json
+                                            exportLauncher.launch("phrasevoice-phrases.json")
+                                        }
+                                        .onFailure { throwable ->
+                                            onFileActionMessage("$exportFailedPrefix${throwable.message ?: cannotCreateFile}")
+                                        }
+                                }
+                            }
+                        )
+                    }
+                }
             }
         }
 
