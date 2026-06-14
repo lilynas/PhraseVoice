@@ -1806,7 +1806,10 @@ private fun SettingsNavigationRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick)
+            .clickable(onClick = {
+                android.util.Log.d("PhraseVoiceDebug", "SettingsNavigationRow clicked: $title")
+                onClick()
+            })
             .padding(vertical = 8.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
