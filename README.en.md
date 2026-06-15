@@ -29,6 +29,14 @@ PhraseVoice is a lightweight Android text-to-speech app for quickly reading text
 - Reading presets, text optimization tools, and current voice preview
 - Light/dark themes, in-app language switching, and optional debug logs
 
+## Offline Voice Models
+
+Open `Settings → Speech & Engine → Offline Voice Models`, or select `Offline sherpa-onnx` on the Provider page and tap `Manage Offline Voice Models`.
+
+1. Download a recommended sherpa-onnx model package from the offline voice page.
+2. Tap `Import` and choose the downloaded `.tar.bz2`, `.zip`, or `.tar` model file.
+3. Return to Studio, select `Offline sherpa-onnx` as Provider, then choose the imported model in the Voice dropdown to read offline.
+
 ## Tech Stack
 
 - Kotlin

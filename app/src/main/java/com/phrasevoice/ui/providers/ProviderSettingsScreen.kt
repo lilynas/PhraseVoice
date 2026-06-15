@@ -99,6 +99,7 @@ fun ProviderSettingsScreen(
     onOptimizeMimoVoiceDesign: () -> Unit,
     onSave: () -> Unit,
     onTestVoice: () -> Unit,
+    onManageOfflineVoices: () -> Unit,
     onBack: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
@@ -188,12 +189,19 @@ fun ProviderSettingsScreen(
                         )
                         Text(
                             t(
-                                "请在「设置 → 离线语音包管理」下载并导入模型；工作台的 Voice 下拉会显示可用模型。",
-                                "Download and import models in Settings → Offline Voice Models. Available models appear in Studio's Voice menu.",
+                                "请在「离线语音包管理」下载并导入模型；工作台的 Voice 下拉会显示可用模型。",
+                                "Download and import models in Offline Voice Models. Available models appear in Studio's Voice menu.",
                             ),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
+                        OutlinedButton(
+                            onClick = onManageOfflineVoices,
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Icon(Icons.Outlined.Tune, contentDescription = null)
+                            Text(t("管理离线语音包", "Manage Offline Voice Models"))
+                        }
                     }
 
                     else -> {
@@ -324,38 +332,41 @@ fun ProviderSettingsScreen(
                             )
                         }
 
-                        state.savedMessage?.let { msg ->
-                            val localizedMessage = localizedProviderStatusMessage(msg)
-                            val isError = msg.contains("失败") || msg.contains("错误") ||
-                                localizedMessage.contains("failed", ignoreCase = true) ||
-                                localizedMessage.contains("error", ignoreCase = true)
-                            val color = if (isError) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
-                            Text(
-                                text = localizedMessage,
-                                color = color,
-                                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
-                                modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 4.dp)
-                            )
-                        }
+                    }
+                }
 
-                        Button(
-                            onClick = onSave,
-                            enabled = !state.isTesting && !state.isOptimizingVoiceDesign,
-                            modifier = Modifier.fillMaxWidth(),
-                        ) {
-                            Icon(Icons.Outlined.Save, contentDescription = null)
-                            Text(t("保存配置", "Save Config"))
-                        }
-                        OutlinedButton(
-                            onClick = onTestVoice,
-                            enabled = selectedHealth.isReady &&
-                                !state.isTesting &&
-                                !state.isOptimizingVoiceDesign,
-                            modifier = Modifier.fillMaxWidth(),
-                        ) {
-                            Icon(Icons.Outlined.PlayArrow, contentDescription = null)
-                            Text(if (state.isTesting) t("试听中", "Testing") else t("保存并试听", "Save & Test"))
-                        }
+                if (state.selectedProviderId != ProviderConfigRepository.ANDROID_SYSTEM) {
+                    state.savedMessage?.let { msg ->
+                        val localizedMessage = localizedProviderStatusMessage(msg)
+                        val isError = msg.contains("失败") || msg.contains("错误") ||
+                            localizedMessage.contains("failed", ignoreCase = true) ||
+                            localizedMessage.contains("error", ignoreCase = true)
+                        val color = if (isError) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
+                        Text(
+                            text = localizedMessage,
+                            color = color,
+                            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 4.dp)
+                        )
+                    }
+
+                    Button(
+                        onClick = onSave,
+                        enabled = !state.isTesting && !state.isOptimizingVoiceDesign,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Icon(Icons.Outlined.Save, contentDescription = null)
+                        Text(t("保存配置", "Save Config"))
+                    }
+                    OutlinedButton(
+                        onClick = onTestVoice,
+                        enabled = selectedHealth.isReady &&
+                            !state.isTesting &&
+                            !state.isOptimizingVoiceDesign,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Icon(Icons.Outlined.PlayArrow, contentDescription = null)
+                        Text(if (state.isTesting) t("试听中", "Testing") else t("保存并试听", "Save & Test"))
                     }
                 }
             }

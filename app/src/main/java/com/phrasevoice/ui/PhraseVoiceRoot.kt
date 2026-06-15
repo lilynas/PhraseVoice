@@ -112,6 +112,7 @@ fun PhraseVoiceRoot(
     val audioClipsViewModel: AudioClipsViewModel = viewModel(factory = factory)
 
     var destination by rememberSaveable { mutableStateOf(Destination.Communicate) }
+    var offlineVoiceModelsRequestKey by rememberSaveable { mutableStateOf(0) }
 
     val context = LocalContext.current
     val homeState by homeViewModel.uiState.collectAsStateWithLifecycle()
@@ -325,6 +326,10 @@ fun PhraseVoiceRoot(
                             onOptimizeMimoVoiceDesign = providerSettingsViewModel::optimizeMimoVoiceDesignPrompt,
                             onSave = providerSettingsViewModel::save,
                             onTestVoice = providerSettingsViewModel::saveAndTestVoice,
+                            onManageOfflineVoices = {
+                                offlineVoiceModelsRequestKey += 1
+                                destination = Destination.Settings
+                            },
                             onBack = { destination = Destination.Settings },
                             modifier = modifier,
                         )
@@ -365,6 +370,7 @@ fun PhraseVoiceRoot(
                             onDisplayCardsExportCompleted = settingsViewModel::markDisplayCardsExportSuccess,
                             onDisplayCardFileActionMessage = settingsViewModel::showDisplayCardFileActionMessage,
                             onNavigateToProviders = { destination = Destination.Providers },
+                            offlineVoiceModelsRequestKey = offlineVoiceModelsRequestKey,
                             modifier = modifier,
                         )
                     }

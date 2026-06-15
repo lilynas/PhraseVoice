@@ -149,6 +149,7 @@ fun SettingsScreen(
     onDisplayCardsExportCompleted: () -> Unit,
     onDisplayCardFileActionMessage: (String) -> Unit,
     onNavigateToProviders: () -> Unit,
+    offlineVoiceModelsRequestKey: Int = 0,
     modifier: Modifier = Modifier,
 ) {
     LaunchedEffect(Unit) {
@@ -157,6 +158,12 @@ fun SettingsScreen(
 
     var showAboutDialog by remember { mutableStateOf(false) }
     var subScreen by remember { mutableStateOf(SettingsSubScreen.Main) }
+
+    LaunchedEffect(offlineVoiceModelsRequestKey) {
+        if (offlineVoiceModelsRequestKey > 0) {
+            subScreen = SettingsSubScreen.OfflineVoice
+        }
+    }
 
     if (showAboutDialog) {
         AboutDialog(onDismiss = { showAboutDialog = false })
@@ -315,6 +322,16 @@ fun SettingsScreen(
                             onClick = onNavigateToProviders
                         )
 
+                        SettingsNavigationRow(
+                            title = t("离线语音包管理", "Offline Voice Models"),
+                            subtitle = t(
+                                "下载/导入 sherpa-onnx 模型，已导入 %d 个语音包".format(settings.offlineVoiceModels.size),
+                                "Download/import sherpa-onnx models, %d packages imported".format(settings.offlineVoiceModels.size),
+                            ),
+                            icon = Icons.Outlined.Tune,
+                            onClick = { subScreen = SettingsSubScreen.OfflineVoice },
+                        )
+
                         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                             Text(
                                 text = t("默认发音引擎", "Default Voice Provider"),
@@ -374,16 +391,6 @@ fun SettingsScreen(
                             text = t("高级功能", "Advanced Options"),
                             style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                             color = MaterialTheme.colorScheme.primary
-                        )
-
-                        SettingsNavigationRow(
-                            title = t("离线语音包管理", "Offline Voice Models"),
-                            subtitle = t(
-                                "已导入 %d 个语音包，云端失败时可优先离线兜底".format(settings.offlineVoiceModels.size),
-                                "Imported %d model packages for offline text-to-speech".format(settings.offlineVoiceModels.size)
-                            ),
-                            icon = Icons.Outlined.Cloud,
-                            onClick = { subScreen = SettingsSubScreen.OfflineVoice }
                         )
 
                         SettingsNavigationRow(
@@ -713,6 +720,10 @@ private fun OfflineVoiceSettingsCard(
             onChange = onFallbackChange,
         )
 
+        OfflineVoiceUsageGuide(
+            hasAvailableModels = models.any { it.status == OfflineVoiceModel.STATUS_AVAILABLE },
+        )
+
         message?.takeIf { it.isNotBlank() }?.let { currentMessage ->
             Text(
                 text = localizedSettingsStatusMessage(currentMessage),
@@ -761,6 +772,53 @@ private fun OfflineVoiceSettingsCard(
                     OfflineVoiceModelRow(model = model, onDelete = onDelete)
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun OfflineVoiceUsageGuide(
+    hasAvailableModels: Boolean,
+) {
+    Surface(
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.18f),
+        contentColor = MaterialTheme.colorScheme.onSurface,
+        shape = RoundedCornerShape(16.dp),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Column(
+            modifier = Modifier.padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            Text(
+                text = t("怎么使用", "How to Use"),
+                style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                color = MaterialTheme.colorScheme.primary,
+            )
+            Text(
+                text = t(
+                    "1. 下载下方推荐的模型包；2. 点右上角「导入」选择下载文件；3. 回到工作台，把 Provider 选为 Offline sherpa-onnx，再在 Voice 里选模型。",
+                    "1. Download a recommended package below; 2. Tap Import and choose the downloaded file; 3. Return to Studio, select Offline sherpa-onnx as Provider, then choose the model in Voice.",
+                ),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Text(
+                text = if (hasAvailableModels) {
+                    t(
+                        "已有可用模型，可以直接去工作台离线朗读。",
+                        "A usable model is installed, so Studio can read offline now.",
+                    )
+                } else {
+                    t(
+                        "还没有可用模型，先下载并导入一个 .tar.bz2 / .zip / .tar 包。",
+                        "No usable model yet. Download and import a .tar.bz2 / .zip / .tar package first.",
+                    )
+                },
+                style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.SemiBold),
+                color = if (hasAvailableModels) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 }
