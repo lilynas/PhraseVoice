@@ -78,10 +78,12 @@ dependencies {
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.zxing.core)
+    implementation(libs.commons.compress)
 
     implementation(libs.media3.common)
     implementation(libs.media3.exoplayer)
     implementation(libs.okhttp)
+    implementation(files("libs/sherpa-onnx-1.13.2.aar"))
 
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)

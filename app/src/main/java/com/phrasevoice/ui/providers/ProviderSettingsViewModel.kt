@@ -7,13 +7,16 @@ import com.phrasevoice.data.model.CustomHttpResponseType
 import com.phrasevoice.data.model.CustomHttpSettings
 import com.phrasevoice.data.model.MimoSettings
 import com.phrasevoice.data.model.MimoVoiceDesignPreset
+import com.phrasevoice.data.model.OfflineVoiceModel
 import com.phrasevoice.data.model.ProviderConfig
 import com.phrasevoice.data.repository.ProviderConfigRepository
 import com.phrasevoice.data.repository.RuntimeProviderConfig
+import com.phrasevoice.data.repository.SettingsRepository
 import com.phrasevoice.data.tts.AudioPlaybackController
 import com.phrasevoice.data.tts.AndroidSystemTtsProvider
 import com.phrasevoice.data.tts.CloudTtsService
 import com.phrasevoice.data.tts.MimoTtsCatalog
+import com.phrasevoice.data.tts.OfflineSherpaTtsProvider
 import com.phrasevoice.debug.AppLogger
 import com.phrasevoice.domain.model.AudioFormat
 import com.phrasevoice.domain.tts.TtsRequest
@@ -49,6 +52,7 @@ data class ProviderSettingsUiState(
     val isOptimizingVoiceDesign: Boolean = false,
     val androidTtsReady: Boolean = true,
     val androidTtsMessage: String? = null,
+    val offlineModelsAvailable: Boolean = false,
 ) {
     val selectedConfig: ProviderConfig?
         get() = configs.firstOrNull { it.providerId == selectedProviderId }
@@ -71,9 +75,11 @@ data class ProviderSettingsUiState(
 
 class ProviderSettingsViewModel(
     private val providerConfigRepository: ProviderConfigRepository,
+    private val settingsRepository: SettingsRepository,
     private val cloudTtsService: CloudTtsService,
     private val audioPlaybackController: AudioPlaybackController,
     private val systemTtsProvider: AndroidSystemTtsProvider,
+    private val offlineSherpaTtsProvider: OfflineSherpaTtsProvider,
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(ProviderSettingsUiState())
     val uiState: StateFlow<ProviderSettingsUiState> = _uiState
@@ -97,6 +103,17 @@ class ProviderSettingsViewModel(
                     androidTtsReady = readiness.ready,
                     androidTtsMessage = readiness.message,
                 )
+            }
+        }
+        viewModelScope.launch {
+            settingsRepository.settings.collect { settings ->
+                _uiState.update {
+                    it.copy(
+                        offlineModelsAvailable = settings.offlineVoiceModels.any { model ->
+                            model.status == OfflineVoiceModel.STATUS_AVAILABLE
+                        },
+                    )
+                }
             }
         }
     }
@@ -371,6 +388,11 @@ class ProviderSettingsViewModel(
 
     fun saveAndTestVoice() {
         val state = uiState.value
+        if (state.selectedProviderId == ProviderConfigRepository.OFFLINE_SHERPA) {
+            saveAndTestOfflineVoice(state)
+            return
+        }
+
         if (state.selectedProviderId != ProviderConfigRepository.OPENAI &&
             state.selectedProviderId != ProviderConfigRepository.EDGE_TTS_FORWARDER &&
             state.selectedProviderId != ProviderConfigRepository.GEMINI &&
@@ -432,6 +454,69 @@ class ProviderSettingsViewModel(
                 }
                 AppLogger.e(TAG, "test failed provider=${state.selectedProviderId}", throwable)
             }
+        }
+    }
+
+    private fun saveAndTestOfflineVoice(state: ProviderSettingsUiState) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isTesting = true, savedMessage = "正在保存并试听") }
+            runCatching {
+                saveDraft(state)
+                val settings = settingsRepository.currentSettings()
+                val voices = offlineSherpaTtsProvider.listVoices(settings.offlineVoiceModels)
+                val voice = voices.firstOrNull()
+                    ?: return@runCatching TtsResult.Error("请先导入可用的离线语音包。")
+                val request = TtsRequest(
+                    text = TEST_TEXT,
+                    providerId = ProviderConfigRepository.OFFLINE_SHERPA,
+                    voiceId = voice.id,
+                    language = voice.language,
+                    speed = 1.0f,
+                    pitch = 1.0f,
+                    volume = 1.0f,
+                    outputFormat = AudioFormat.WAV,
+                )
+                offlineSherpaTtsProvider.synthesize(
+                    request = request,
+                    models = settings.offlineVoiceModels,
+                    cache = true,
+                )
+            }.fold(
+                onSuccess = { result ->
+                    when (result) {
+                        is TtsResult.AudioFile -> {
+                            audioPlaybackController.play(result.uri)
+                            _uiState.update {
+                                it.copy(
+                                    savedMessage = "试听已播放",
+                                    isTesting = false,
+                                )
+                            }
+                            AppLogger.i(TAG, "offline test playback started")
+                        }
+
+                        is TtsResult.Error -> {
+                            _uiState.update {
+                                it.copy(savedMessage = "试听失败：${result.message}", isTesting = false)
+                            }
+                            AppLogger.e(TAG, "offline test failed: ${result.message}", result.cause)
+                        }
+
+                        is TtsResult.LocalPlaybackStarted -> {
+                            _uiState.update { it.copy(savedMessage = "试听已播放", isTesting = false) }
+                        }
+                    }
+                },
+                onFailure = { throwable ->
+                    _uiState.update {
+                        it.copy(
+                            savedMessage = "试听失败：${throwable.message ?: "未知错误"}",
+                            isTesting = false,
+                        )
+                    }
+                    AppLogger.e(TAG, "offline test failed", throwable)
+                },
+            )
         }
     }
 

@@ -13,6 +13,7 @@ import com.phrasevoice.data.security.ApiKeyCipher
 import com.phrasevoice.data.tts.AudioPlaybackController
 import com.phrasevoice.data.tts.AndroidSystemTtsProvider
 import com.phrasevoice.data.tts.CloudTtsService
+import com.phrasevoice.data.tts.OfflineSherpaTtsProvider
 
 class AppContainer(context: Context) {
     private val applicationContext = context.applicationContext
@@ -27,6 +28,7 @@ class AppContainer(context: Context) {
     val offlineVoiceModelStore = OfflineVoiceModelStore(applicationContext)
     val audioClipRepository = AudioClipRepository(dataStore, audioFileStore)
     val systemTtsProvider = AndroidSystemTtsProvider(applicationContext)
+    val offlineSherpaTtsProvider = OfflineSherpaTtsProvider(offlineVoiceModelStore, audioFileStore)
     val cloudTtsService = CloudTtsService(audioFileStore)
     val audioPlaybackController = AudioPlaybackController(applicationContext)
 }

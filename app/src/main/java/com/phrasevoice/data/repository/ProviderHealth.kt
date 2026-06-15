@@ -7,6 +7,7 @@ enum class ProviderHealthStatus {
     Disabled,
     MissingApiKey,
     MissingBaseUrl,
+    MissingOfflineModel,
     SystemUnavailable,
 }
 
@@ -16,6 +17,7 @@ val ProviderHealthStatus.isReady: Boolean
 fun providerHealthForConfig(
     config: ProviderConfig,
     androidTtsReady: Boolean = true,
+    hasOfflineModels: Boolean = true,
 ): ProviderHealthStatus =
     providerHealthForDraft(
         providerId = config.providerId,
@@ -23,6 +25,7 @@ fun providerHealthForConfig(
         hasApiKey = !config.encryptedValue.isNullOrBlank(),
         baseUrl = config.baseUrl,
         androidTtsReady = androidTtsReady,
+        hasOfflineModels = hasOfflineModels,
     )
 
 fun providerHealthForDraft(
@@ -31,6 +34,7 @@ fun providerHealthForDraft(
     hasApiKey: Boolean,
     baseUrl: String?,
     androidTtsReady: Boolean = true,
+    hasOfflineModels: Boolean = true,
 ): ProviderHealthStatus {
     if (providerId == ProviderConfigRepository.ANDROID_SYSTEM) {
         if (!androidTtsReady) return ProviderHealthStatus.SystemUnavailable
@@ -38,6 +42,10 @@ fun providerHealthForDraft(
     }
 
     if (!enabled) return ProviderHealthStatus.Disabled
+
+    if (providerId == ProviderConfigRepository.OFFLINE_SHERPA && !hasOfflineModels) {
+        return ProviderHealthStatus.MissingOfflineModel
+    }
 
     if (requiresBaseUrl(providerId) && baseUrl.isNullOrBlank()) {
         return ProviderHealthStatus.MissingBaseUrl

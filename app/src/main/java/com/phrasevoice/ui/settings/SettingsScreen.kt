@@ -379,7 +379,7 @@ fun SettingsScreen(
                         SettingsNavigationRow(
                             title = t("离线语音包管理", "Offline Voice Models"),
                             subtitle = t(
-                                "已导入 %d 个语音包，管理云端失败时的离线兜底发音".format(settings.offlineVoiceModels.size),
+                                "已导入 %d 个语音包，云端失败时可优先离线兜底".format(settings.offlineVoiceModels.size),
                                 "Imported %d model packages for offline text-to-speech".format(settings.offlineVoiceModels.size)
                             ),
                             icon = Icons.Outlined.Cloud,
@@ -708,7 +708,7 @@ private fun OfflineVoiceSettingsCard(
         }
 
         SwitchSetting(
-            label = t("云端失败时使用本机语音", "Use system voice if cloud fails"),
+            label = t("云端失败时使用离线/本机语音", "Use offline/system voice if cloud fails"),
             value = fallbackEnabled,
             onChange = onFallbackChange,
         )

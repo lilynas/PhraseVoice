@@ -22,7 +22,8 @@ PhraseVoice is a lightweight Android text-to-speech app for quickly reading text
 - Read text aloud, stop playback, save audio, and share generated audio
 - Phrase library: add, edit, favorite, search, import, and export JSON
 - History: replay past text and save items as reusable phrases
-- Multiple providers: Android System TTS, OpenAI TTS, Edge TTS Forwarder, Gemini TTS, MiMo TTS, and Custom HTTP
+- Multiple providers: Android System TTS, Offline sherpa-onnx, OpenAI TTS, Edge TTS Forwarder, Gemini TTS, MiMo TTS, and Custom HTTP
+- Offline voice models: download and import sherpa-onnx TTS models, then read aloud offline from Studio
 - MiMo VoiceDesign character voices, prompt optimization, and streaming synthesis
 - First-run setup guidance and Provider readiness indicators
 - Reading presets, text optimization tools, and current voice preview
