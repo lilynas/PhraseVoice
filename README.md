@@ -51,6 +51,8 @@ PhraseVoice 是一个简洁的 Android 文本转语音工具，适合快速输�
 
 请在 [Releases](https://github.com/lilynas/PhraseVoice/releases) 下载最新 APK。
 
+APK 按 CPU 架构分包发布：多数手机选择 `arm64-v8a`，MuMu/部分模拟器选择 `x86_64`。
+
 ## 构建
 
 项目通过 GitHub Actions 编译。CI 使用 JDK 17、Android SDK 35 和 Gradle 8.7 执行：

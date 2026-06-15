@@ -51,6 +51,8 @@ Open `Settings → Speech & Engine → Offline Voice Models`, or select `Offline
 
 Download the latest APK from [Releases](https://github.com/lilynas/PhraseVoice/releases).
 
+APKs are split by CPU architecture: most phones should use `arm64-v8a`, while MuMu and some emulators should use `x86_64`.
+
 ## Build
 
 The project is built through GitHub Actions. CI uses JDK 17, Android SDK 35, and Gradle 8.7:
