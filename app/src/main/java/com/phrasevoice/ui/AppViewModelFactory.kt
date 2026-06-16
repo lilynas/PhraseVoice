@@ -22,6 +22,7 @@ class AppViewModelFactory(
                 settingsRepository = container.settingsRepository,
                 providerConfigRepository = container.providerConfigRepository,
                 systemTtsProvider = container.systemTtsProvider,
+                offlineSherpaTtsProvider = container.offlineSherpaTtsProvider,
                 cloudTtsService = container.cloudTtsService,
                 audioPlaybackController = container.audioPlaybackController,
                 audioFileStore = container.audioFileStore,
@@ -51,9 +52,11 @@ class AppViewModelFactory(
 
             modelClass.isAssignableFrom(ProviderSettingsViewModel::class.java) -> ProviderSettingsViewModel(
                 providerConfigRepository = container.providerConfigRepository,
+                settingsRepository = container.settingsRepository,
                 cloudTtsService = container.cloudTtsService,
                 audioPlaybackController = container.audioPlaybackController,
                 systemTtsProvider = container.systemTtsProvider,
+                offlineSherpaTtsProvider = container.offlineSherpaTtsProvider,
             )
 
             else -> error("Unknown ViewModel class: ${modelClass.name}")

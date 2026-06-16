@@ -22,11 +22,20 @@ PhraseVoice is a lightweight Android text-to-speech app for quickly reading text
 - Read text aloud, stop playback, save audio, and share generated audio
 - Phrase library: add, edit, favorite, search, import, and export JSON
 - History: replay past text and save items as reusable phrases
-- Multiple providers: Android System TTS, OpenAI TTS, Edge TTS Forwarder, Gemini TTS, MiMo TTS, and Custom HTTP
+- Multiple providers: Android System TTS, Offline sherpa-onnx, OpenAI TTS, Edge TTS Forwarder, Gemini TTS, MiMo TTS, and Custom HTTP
+- Offline voice models: download and import sherpa-onnx TTS models, then read aloud offline from Studio
 - MiMo VoiceDesign character voices, prompt optimization, and streaming synthesis
 - First-run setup guidance and Provider readiness indicators
 - Reading presets, text optimization tools, and current voice preview
 - Light/dark themes, in-app language switching, and optional debug logs
+
+## Offline Voice Models
+
+Open `Settings → Speech & Engine → Offline Voice Models`, or select `Offline sherpa-onnx` on the Provider page and tap `Manage Offline Voice Models`.
+
+1. Download a recommended sherpa-onnx model package from the offline voice page.
+2. Tap `Import` and choose the downloaded `.tar.bz2`, `.zip`, or `.tar` model file.
+3. Return to Studio, select `Offline sherpa-onnx` as Provider, then choose the imported model in the Voice dropdown to read offline.
 
 ## Tech Stack
 
@@ -41,6 +50,8 @@ PhraseVoice is a lightweight Android text-to-speech app for quickly reading text
 ## Download
 
 Download the latest APK from [Releases](https://github.com/lilynas/PhraseVoice/releases).
+
+APKs are split by CPU architecture: most phones should use `arm64-v8a`, while MuMu and some emulators should use `x86_64`.
 
 ## Build
 

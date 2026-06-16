@@ -12,11 +12,20 @@ android {
     defaultConfig {
         applicationId = "com.shirone.phrasevoice"
         minSdk = 26
-        targetSdk = 35
-        versionCode = 5
-        versionName = "0.4.0"
+        targetSdk = 36
+        versionCode = 6
+        versionName = "0.4.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+    }
+
+    splits {
+        abi {
+            isEnable = true
+            reset()
+            include("arm64-v8a", "armeabi-v7a", "x86", "x86_64")
+            isUniversalApk = false
+        }
     }
 
     signingConfigs {
@@ -78,10 +87,12 @@ dependencies {
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.zxing.core)
+    implementation(libs.commons.compress)
 
     implementation(libs.media3.common)
     implementation(libs.media3.exoplayer)
     implementation(libs.okhttp)
+    implementation(files("libs/sherpa-onnx-1.13.2.aar"))
 
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)

@@ -6,6 +6,9 @@ import java.util.Locale
 object OfflineVoiceModelMetadata {
     private val supportedExtensions = setOf("onnx", "zip", "tar", "tgz", "tar.gz", "tar.bz2")
 
+    fun isSupportedExtension(displayName: String): Boolean =
+        extensionFor(displayName) in supportedExtensions
+
     fun statusFor(displayName: String, sizeBytes: Long): String {
         if (sizeBytes <= 0L) return OfflineVoiceModel.STATUS_CORRUPT
         val extension = extensionFor(displayName)

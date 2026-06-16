@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.phrasevoice.data.local.AudioFileStore
 import com.phrasevoice.data.local.PhraseVoiceJson
+import com.phrasevoice.data.model.OfflineVoiceModel
 import com.phrasevoice.data.model.MimoSettings
 import com.phrasevoice.data.model.MimoVoiceDesignPreset
 import com.phrasevoice.data.model.ProviderConfig
@@ -23,6 +24,7 @@ import com.phrasevoice.data.tts.EdgeForwarderCatalog
 import com.phrasevoice.data.tts.EdgeForwarderStyle
 import com.phrasevoice.data.tts.GeminiTtsCatalog
 import com.phrasevoice.data.tts.MimoTtsCatalog
+import com.phrasevoice.data.tts.OfflineSherpaTtsProvider
 import com.phrasevoice.debug.AppLogger
 import com.phrasevoice.domain.text.TextOptimizationAction
 import com.phrasevoice.domain.text.TextOptimizer
@@ -104,6 +106,7 @@ class HomeViewModel(
     private val settingsRepository: SettingsRepository,
     private val providerConfigRepository: ProviderConfigRepository,
     private val systemTtsProvider: AndroidSystemTtsProvider,
+    private val offlineSherpaTtsProvider: OfflineSherpaTtsProvider,
     private val cloudTtsService: CloudTtsService,
     private val audioPlaybackController: AudioPlaybackController,
     private val audioFileStore: AudioFileStore,
@@ -112,6 +115,7 @@ class HomeViewModel(
     val uiState: StateFlow<HomeUiState> = _uiState
     private var providerConfigs: List<ProviderConfig> = ProviderConfigRepository.defaultConfigs()
     private var androidVoices: List<TtsVoice> = emptyList()
+    private var offlineVoices: List<TtsVoice> = emptyList()
     private var phraseGroups: List<PhraseGroup> = emptyList()
     private var libraryPhrases: List<Phrase> = emptyList()
 
@@ -121,6 +125,9 @@ class HomeViewModel(
         }
         viewModelScope.launch {
             settingsRepository.settings.collect { settings ->
+                offlineVoices = withContext(Dispatchers.IO) {
+                    offlineSherpaTtsProvider.listVoices(settings.offlineVoiceModels)
+                }
                 _uiState.update { state ->
                     val providerId = settings.defaultProviderId
                     val voices = voicesFor(providerId)
@@ -129,6 +136,13 @@ class HomeViewModel(
                         isMimoSmartTextOptimizationAvailable(providerId)
                     state.copy(
                         selectedProviderId = settings.defaultProviderId,
+                        providers = providerConfigs.map {
+                            it.toProviderOption(
+                                androidTtsReady = state.androidTtsReady,
+                                androidTtsMessage = state.androidTtsMessage,
+                                hasOfflineModels = offlineVoices.isNotEmpty(),
+                            )
+                        },
                         voices = voices,
                         selectedVoiceId = state.selectedVoiceId
                             ?.takeIf { voiceId -> voices.any { it.id == voiceId } }
@@ -155,6 +169,7 @@ class HomeViewModel(
                         it.toProviderOption(
                             androidTtsReady = state.androidTtsReady,
                             androidTtsMessage = state.androidTtsMessage,
+                            hasOfflineModels = offlineVoices.isNotEmpty(),
                         )
                     }
                     val selectedProviderId = state.selectedProviderId
@@ -201,12 +216,13 @@ class HomeViewModel(
                 state.copy(
                     androidTtsReady = readiness.ready,
                     androidTtsMessage = readiness.message,
-                    providers = providerConfigs.map {
-                        it.toProviderOption(
-                            androidTtsReady = readiness.ready,
-                            androidTtsMessage = readiness.message,
-                        )
-                    },
+                        providers = providerConfigs.map {
+                            it.toProviderOption(
+                                androidTtsReady = readiness.ready,
+                                androidTtsMessage = readiness.message,
+                                hasOfflineModels = offlineVoices.isNotEmpty(),
+                            )
+                        },
                     status = if (selectedAndroid && !readiness.ready) HomeStatus.Error else state.status,
                     errorMessage = if (selectedAndroid && !readiness.ready) readiness.message else state.errorMessage,
                 )
@@ -559,6 +575,7 @@ class HomeViewModel(
 
     fun stop() {
         systemTtsProvider.stop()
+        offlineSherpaTtsProvider.stop()
         audioPlaybackController.stop()
         _uiState.update { it.copy(status = HomeStatus.Idle) }
     }
@@ -588,6 +605,24 @@ class HomeViewModel(
                 request.outcome(result)
             }
 
+            ProviderConfigRepository.OFFLINE_SHERPA -> {
+                val settings = settingsRepository.currentSettings()
+                if (playAudioFile && !settings.keepAudioCache) {
+                    withContext(Dispatchers.IO) {
+                        audioFileStore.clearCache()
+                    }
+                }
+                val result = offlineSherpaTtsProvider.synthesize(
+                    request = request,
+                    models = settings.offlineVoiceModels,
+                    cache = playAudioFile,
+                )
+                if (playAudioFile && result is TtsResult.AudioFile) {
+                    audioPlaybackController.play(result.uri)
+                }
+                request.outcome(result)
+            }
+
             ProviderConfigRepository.OPENAI,
             ProviderConfigRepository.EDGE_TTS_FORWARDER,
             ProviderConfigRepository.GEMINI,
@@ -608,7 +643,7 @@ class HomeViewModel(
                     audioPlaybackController.play(result.uri)
                 }
                 if (result is TtsResult.Error && settings.cloudFallbackToSystemTts) {
-                    synthesizeWithSystemFallback(request, playAudioFile, result)
+                    synthesizeWithOfflineOrSystemFallback(request, playAudioFile, result, settings.offlineVoiceModels)
                 } else {
                     request.outcome(result)
                 }
@@ -618,11 +653,46 @@ class HomeViewModel(
         }
     }
 
-    private suspend fun synthesizeWithSystemFallback(
+    private suspend fun synthesizeWithOfflineOrSystemFallback(
         originalRequest: TtsRequest,
         playAudioFile: Boolean,
         cloudError: TtsResult.Error,
+        offlineModels: List<OfflineVoiceModel>,
     ): SynthesisOutcome {
+        val offlineVoices = offlineSherpaTtsProvider.listVoices(offlineModels)
+        if (offlineVoices.isNotEmpty()) {
+            val fallbackRequest = originalRequest.copy(
+                providerId = ProviderConfigRepository.OFFLINE_SHERPA,
+                voiceId = offlineVoices.first().id,
+                language = offlineVoices.first().language,
+                stylePrompt = null,
+                outputFormat = AudioFormat.WAV,
+                mimoOptimizeTextPreview = false,
+            )
+            AppLogger.w(
+                TAG,
+                "cloud provider failed; fallback to offline sherpa provider=${originalRequest.providerId} message=${cloudError.message}",
+            )
+            val fallbackResult = offlineSherpaTtsProvider.synthesize(
+                request = fallbackRequest,
+                models = offlineModels,
+                cache = playAudioFile,
+            )
+            if (playAudioFile && fallbackResult is TtsResult.AudioFile) {
+                audioPlaybackController.play(fallbackResult.uri)
+            }
+            if (fallbackResult !is TtsResult.Error) {
+                return fallbackRequest.outcome(
+                    result = fallbackResult,
+                    noticeMessage = "云端失败，已切换到离线语音包。",
+                )
+            }
+            AppLogger.w(
+                TAG,
+                "offline fallback failed; trying system tts message=${fallbackResult.message}",
+            )
+        }
+
         val fallbackRequest = originalRequest.copy(
             providerId = ProviderConfigRepository.ANDROID_SYSTEM,
             voiceId = null,
@@ -674,7 +744,8 @@ class HomeViewModel(
         when (uiState.value.selectedProviderId) {
             ProviderConfigRepository.ANDROID_SYSTEM,
             ProviderConfigRepository.GEMINI,
-            ProviderConfigRepository.MIMO -> AudioFormat.WAV
+            ProviderConfigRepository.MIMO,
+            ProviderConfigRepository.OFFLINE_SHERPA -> AudioFormat.WAV
             else -> AudioFormat.MP3
         }
 
@@ -733,10 +804,12 @@ class HomeViewModel(
     private fun ProviderConfig.toProviderOption(
         androidTtsReady: Boolean = true,
         androidTtsMessage: String? = null,
+        hasOfflineModels: Boolean = true,
     ): TtsProviderOption {
         val status = providerHealthForConfig(
             config = this,
             androidTtsReady = androidTtsReady,
+            hasOfflineModels = hasOfflineModels,
         )
         return TtsProviderOption(
             id = providerId,
@@ -748,6 +821,7 @@ class HomeViewModel(
                 ProviderHealthStatus.Disabled -> "未配置"
                 ProviderHealthStatus.MissingApiKey -> "缺少 API Key"
                 ProviderHealthStatus.MissingBaseUrl -> "缺少 Base URL"
+                ProviderHealthStatus.MissingOfflineModel -> "缺少离线语音包"
                 ProviderHealthStatus.SystemUnavailable ->
                     androidTtsMessage ?: "系统 TTS 不可用"
             },
@@ -761,6 +835,7 @@ class HomeViewModel(
                 ProviderConfigRepository.EDGE_TTS_FORWARDER -> "Edge TTS Forwarder"
                 ProviderConfigRepository.GEMINI -> "Gemini TTS"
                 ProviderConfigRepository.MIMO -> "MiMo TTS"
+                ProviderConfigRepository.OFFLINE_SHERPA -> "Offline sherpa-onnx"
                 ProviderConfigRepository.CUSTOM_HTTP -> "Custom TTS API"
                 else -> providerId
         }
@@ -774,6 +849,7 @@ class HomeViewModel(
             ProviderHealthStatus.Disabled -> "$providerName 未配置，请先在 Provider 页面启用并保存。"
             ProviderHealthStatus.MissingApiKey -> "$providerName 缺少 API Key，请先在 Provider 页面保存 API Key。"
             ProviderHealthStatus.MissingBaseUrl -> "$providerName 缺少 Base URL，请先在 Provider 页面填写服务地址。"
+            ProviderHealthStatus.MissingOfflineModel -> "$providerName 缺少可用离线语音包，请先在设置中导入模型。"
             ProviderHealthStatus.SystemUnavailable -> "Android 系统 TTS 暂不可用。"
         }
 
@@ -794,6 +870,7 @@ class HomeViewModel(
             ProviderConfigRepository.EDGE_TTS_FORWARDER -> edgeForwarderVoices()
             ProviderConfigRepository.GEMINI -> geminiVoices()
             ProviderConfigRepository.MIMO -> mimoVoices()
+            ProviderConfigRepository.OFFLINE_SHERPA -> offlineVoices
             ProviderConfigRepository.CUSTOM_HTTP -> {
                 val voice = providerConfigs
                     .firstOrNull { it.providerId == ProviderConfigRepository.CUSTOM_HTTP }

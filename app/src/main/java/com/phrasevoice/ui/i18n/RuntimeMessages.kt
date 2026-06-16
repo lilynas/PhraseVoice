@@ -62,6 +62,11 @@ fun localizedHomeErrorMessage(message: String): String {
         val providerName = message.removeSuffix(missingBaseUrlSuffix)
         return t(message, "$providerName is missing a Base URL. Enter the service URL on the Provider page first.")
     }
+    val missingOfflineModelSuffix = " 缺少可用离线语音包，请先在设置中导入模型。"
+    if (message.endsWith(missingOfflineModelSuffix)) {
+        val providerName = message.removeSuffix(missingOfflineModelSuffix)
+        return t(message, "$providerName needs an offline model. Import one in Settings first.")
+    }
     return localizedRuntimeMessage(message)
 }
 
@@ -72,6 +77,7 @@ fun localizedProviderHealthLabel(status: ProviderHealthStatus): String =
         ProviderHealthStatus.Disabled -> t("未配置", "Not configured")
         ProviderHealthStatus.MissingApiKey -> t("缺少 API Key", "Missing API key")
         ProviderHealthStatus.MissingBaseUrl -> t("缺少 Base URL", "Missing Base URL")
+        ProviderHealthStatus.MissingOfflineModel -> t("缺少离线语音包", "Missing offline model")
         ProviderHealthStatus.SystemUnavailable -> t("系统 TTS 不可用", "System TTS unavailable")
     }
 
@@ -97,6 +103,10 @@ fun localizedProviderHealthDescription(
         ProviderHealthStatus.MissingBaseUrl -> t(
             "请填写服务地址，然后再试听 $providerName。",
             "Enter the service URL before testing $providerName.",
+        )
+        ProviderHealthStatus.MissingOfflineModel -> t(
+            "请先在设置的离线语音包管理中导入可用模型，然后再使用 $providerName。",
+            "Import an available model in Offline Voice settings before using $providerName.",
         )
         ProviderHealthStatus.SystemUnavailable -> if (!androidTtsMessage.isNullOrBlank()) {
             localizedRuntimeMessage(androidTtsMessage)
@@ -156,7 +166,20 @@ fun localizedSettingsStatusMessage(message: String): String {
         return t(message, "Cleared $count audio files.")
     }
 
-    return localizedRuntimeMessage(message)
+    if (message.startsWith("导入失败：")) {
+        val detail = message.removePrefix("导入失败：")
+        return t(message, "Import failed: ${localizedRuntimeMessage(detail)}")
+    }
+
+    return when (message) {
+        "已导入离线语音模型，可在工作台选择 Offline sherpa-onnx。" ->
+            t(message, "Offline voice model imported. Select Offline sherpa-onnx in Studio.")
+        "模型包为空，已标记为损坏。" -> t(message, "The model package is empty and was marked corrupt.")
+        "未找到可用 sherpa-onnx TTS 模型结构，已保留记录。" ->
+            t(message, "No usable sherpa-onnx TTS model layout was found. The record was kept.")
+        "已删除离线语音模型。" -> t(message, "Offline voice model deleted.")
+        else -> localizedRuntimeMessage(message)
+    }
 }
 
 @Composable
@@ -250,6 +273,11 @@ fun localizedRuntimeMessage(message: String): String {
         return t(message, "Request failed: HTTP $code.")
     }
 
+    if (message.startsWith("离线语音合成失败：")) {
+        val detail = message.removePrefix("离线语音合成失败：")
+        return t(message, "Offline voice synthesis failed: ${localizedRuntimeMessage(detail)}")
+    }
+
     if (message.startsWith("JSON 中没有找到字段：")) {
         val fieldPath = message.removePrefix("JSON 中没有找到字段：")
         return t(message, "JSON field not found: $fieldPath")
@@ -266,6 +294,10 @@ fun localizedRuntimeMessage(message: String): String {
         "请输入要朗读的文字。" -> t(message, "Enter text to read.")
         "请输入要保存为音频的文字。" -> t(message, "Enter text to save as audio.")
         "Android 系统 TTS 暂不可用。" -> t(message, "Android System TTS is currently unavailable.")
+        "请先在设置中导入可用的离线语音包。" -> t(message, "Import an available offline voice model in Settings first.")
+        "离线语音包不可用，请重新导入模型包。" -> t(message, "The offline voice model is unavailable. Re-import the model package.")
+        "离线语音没有生成音频。" -> t(message, "The offline voice model did not generate audio.")
+        "云端失败，已切换到离线语音包。" -> t(message, "Cloud voice failed. Switched to the offline voice model.")
         "该 Provider 暂未接入。" -> t(message, "This Provider is not supported yet.")
         "请先在 Provider 页面启用并保存该 Provider。" -> t(message, "Enable and save this Provider on the Provider page first.")
         "请先在 Provider 页面保存 API Key。" -> t(message, "Save the API key on the Provider page first.")

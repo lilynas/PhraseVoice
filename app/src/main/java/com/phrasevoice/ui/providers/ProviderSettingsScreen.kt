@@ -99,6 +99,7 @@ fun ProviderSettingsScreen(
     onOptimizeMimoVoiceDesign: () -> Unit,
     onSave: () -> Unit,
     onTestVoice: () -> Unit,
+    onManageOfflineVoices: () -> Unit,
     onBack: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
@@ -108,6 +109,7 @@ fun ProviderSettingsScreen(
         hasApiKey = state.hasSavedApiKey || state.apiKeyDraft.isNotBlank(),
         baseUrl = state.baseUrlDraft,
         androidTtsReady = state.androidTtsReady,
+        hasOfflineModels = state.offlineModelsAvailable,
     )
 
     Column(
@@ -176,6 +178,30 @@ fun ProviderSettingsScreen(
                 when (state.selectedProviderId) {
                     ProviderConfigRepository.ANDROID_SYSTEM -> {
                         Text(t("系统 TTS 使用手机已安装的语音服务，无需 API Key。", "System TTS uses voice services installed on this device. No API key is required."))
+                    }
+
+                    ProviderConfigRepository.OFFLINE_SHERPA -> {
+                        Text(
+                            t(
+                                "使用已导入的 sherpa-onnx 离线语音包，无需网络和 API Key。",
+                                "Uses imported sherpa-onnx offline voice packages. No network or API key is required.",
+                            ),
+                        )
+                        Text(
+                            t(
+                                "请在「离线语音包管理」下载并导入模型；工作台的 Voice 下拉会显示可用模型。",
+                                "Download and import models in Offline Voice Models. Available models appear in Studio's Voice menu.",
+                            ),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        OutlinedButton(
+                            onClick = onManageOfflineVoices,
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Icon(Icons.Outlined.Tune, contentDescription = null)
+                            Text(t("管理离线语音包", "Manage Offline Voice Models"))
+                        }
                     }
 
                     else -> {
@@ -306,38 +332,41 @@ fun ProviderSettingsScreen(
                             )
                         }
 
-                        state.savedMessage?.let { msg ->
-                            val localizedMessage = localizedProviderStatusMessage(msg)
-                            val isError = msg.contains("失败") || msg.contains("错误") ||
-                                localizedMessage.contains("failed", ignoreCase = true) ||
-                                localizedMessage.contains("error", ignoreCase = true)
-                            val color = if (isError) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
-                            Text(
-                                text = localizedMessage,
-                                color = color,
-                                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
-                                modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 4.dp)
-                            )
-                        }
+                    }
+                }
 
-                        Button(
-                            onClick = onSave,
-                            enabled = !state.isTesting && !state.isOptimizingVoiceDesign,
-                            modifier = Modifier.fillMaxWidth(),
-                        ) {
-                            Icon(Icons.Outlined.Save, contentDescription = null)
-                            Text(t("保存配置", "Save Config"))
-                        }
-                        OutlinedButton(
-                            onClick = onTestVoice,
-                            enabled = selectedHealth.isReady &&
-                                !state.isTesting &&
-                                !state.isOptimizingVoiceDesign,
-                            modifier = Modifier.fillMaxWidth(),
-                        ) {
-                            Icon(Icons.Outlined.PlayArrow, contentDescription = null)
-                            Text(if (state.isTesting) t("试听中", "Testing") else t("保存并试听", "Save & Test"))
-                        }
+                if (state.selectedProviderId != ProviderConfigRepository.ANDROID_SYSTEM) {
+                    state.savedMessage?.let { msg ->
+                        val localizedMessage = localizedProviderStatusMessage(msg)
+                        val isError = msg.contains("失败") || msg.contains("错误") ||
+                            localizedMessage.contains("failed", ignoreCase = true) ||
+                            localizedMessage.contains("error", ignoreCase = true)
+                        val color = if (isError) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
+                        Text(
+                            text = localizedMessage,
+                            color = color,
+                            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 4.dp)
+                        )
+                    }
+
+                    Button(
+                        onClick = onSave,
+                        enabled = !state.isTesting && !state.isOptimizingVoiceDesign,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Icon(Icons.Outlined.Save, contentDescription = null)
+                        Text(t("保存配置", "Save Config"))
+                    }
+                    OutlinedButton(
+                        onClick = onTestVoice,
+                        enabled = selectedHealth.isReady &&
+                            !state.isTesting &&
+                            !state.isOptimizingVoiceDesign,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Icon(Icons.Outlined.PlayArrow, contentDescription = null)
+                        Text(if (state.isTesting) t("试听中", "Testing") else t("保存并试听", "Save & Test"))
                     }
                 }
             }
@@ -563,6 +592,7 @@ private fun ProviderSelectorDropdown(
                 val health = providerHealthForConfig(
                     config = config,
                     androidTtsReady = state.androidTtsReady,
+                    hasOfflineModels = state.offlineModelsAvailable,
                 )
                 DropdownMenuItem(
                     text = {
@@ -643,6 +673,7 @@ private fun ProviderIcon(providerId: String) {
     val icon = when (providerId) {
         ProviderConfigRepository.ANDROID_SYSTEM -> Icons.Outlined.PhoneAndroid
         ProviderConfigRepository.EDGE_TTS_FORWARDER -> Icons.Outlined.Cloud
+        ProviderConfigRepository.OFFLINE_SHERPA -> Icons.Outlined.Tune
         ProviderConfigRepository.CUSTOM_HTTP -> Icons.Outlined.Tune
         else -> Icons.Outlined.Cloud
     }
@@ -1025,6 +1056,7 @@ private fun providerLabel(providerId: String): String =
         ProviderConfigRepository.EDGE_TTS_FORWARDER -> "Edge TTS Forwarder"
         ProviderConfigRepository.GEMINI -> "Gemini TTS"
         ProviderConfigRepository.MIMO -> "MiMo TTS"
+        ProviderConfigRepository.OFFLINE_SHERPA -> "Offline sherpa-onnx"
         ProviderConfigRepository.CUSTOM_HTTP -> "Custom TTS API"
         else -> providerId
     }

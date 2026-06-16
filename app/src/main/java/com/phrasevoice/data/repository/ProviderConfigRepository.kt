@@ -113,6 +113,7 @@ class ProviderConfigRepository(
         const val EDGE_TTS_FORWARDER = "edge_tts_forwarder"
         const val GEMINI = "gemini"
         const val MIMO = "mimo"
+        const val OFFLINE_SHERPA = "offline_sherpa"
         const val CUSTOM_HTTP = "custom_http"
 
         fun defaultConfigs(): List<ProviderConfig> =
@@ -148,6 +149,10 @@ class ProviderConfigRepository(
                     model = MimoTtsCatalog.PRESET_MODEL_ID,
                     defaultVoice = MimoTtsCatalog.DEFAULT_VOICE_ID,
                     extraJson = PhraseVoiceJson.encode(MimoSettings()),
+                ),
+                ProviderConfig(
+                    providerId = OFFLINE_SHERPA,
+                    enabled = true,
                 ),
                 ProviderConfig(
                     providerId = CUSTOM_HTTP,

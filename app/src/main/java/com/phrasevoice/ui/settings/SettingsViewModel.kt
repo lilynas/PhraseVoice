@@ -93,9 +93,12 @@ class SettingsViewModel(
             cacheMessage,
             AppLogger.entries,
         ) { settings, providerConfigs, cacheInfo, message, logs ->
+            val hasOfflineModels = settings.offlineVoiceModels.any {
+                it.status == OfflineVoiceModel.STATUS_AVAILABLE
+            }
             SettingsUiState(
                 settings = settings,
-                providers = providerConfigs.map(::toProviderOption),
+                providers = providerConfigs.map { toProviderOption(it, hasOfflineModels) },
                 audioCacheInfo = cacheInfo,
                 cacheMessage = message,
                 debugLogs = logs,
@@ -379,9 +382,9 @@ class SettingsViewModel(
                         )
                     }
                     offlineVoiceMessage.value = when (model.status) {
-                        OfflineVoiceModel.STATUS_AVAILABLE -> "已导入离线语音模型。"
+                        OfflineVoiceModel.STATUS_AVAILABLE -> "已导入离线语音模型，可在工作台选择 Offline sherpa-onnx。"
                         OfflineVoiceModel.STATUS_CORRUPT -> "模型包为空，已标记为损坏。"
-                        OfflineVoiceModel.STATUS_INCOMPATIBLE -> "模型包类型暂不兼容，已保留记录。"
+                        OfflineVoiceModel.STATUS_INCOMPATIBLE -> "未找到可用 sherpa-onnx TTS 模型结构，已保留记录。"
                         else -> "已导入离线语音模型。"
                     }
                 }
@@ -495,8 +498,11 @@ class SettingsViewModel(
     private fun List<DisplayCard>.normalizedDisplayCardOrder(): List<DisplayCard> =
         sortedBy { it.sortOrder }.mapIndexed { index, card -> card.copy(sortOrder = index) }
 
-    private fun toProviderOption(config: ProviderConfig): SettingsProviderOption {
-        val status = providerHealthForConfig(config)
+    private fun toProviderOption(config: ProviderConfig, hasOfflineModels: Boolean): SettingsProviderOption {
+        val status = providerHealthForConfig(
+            config = config,
+            hasOfflineModels = hasOfflineModels,
+        )
         return SettingsProviderOption(
             id = config.providerId,
             name = when (config.providerId) {
@@ -505,6 +511,7 @@ class SettingsViewModel(
                 ProviderConfigRepository.EDGE_TTS_FORWARDER -> "Edge TTS Forwarder"
                 ProviderConfigRepository.GEMINI -> "Gemini TTS"
                 ProviderConfigRepository.MIMO -> "MiMo TTS"
+                ProviderConfigRepository.OFFLINE_SHERPA -> "Offline sherpa-onnx"
                 ProviderConfigRepository.CUSTOM_HTTP -> "Custom TTS API"
                 else -> config.providerId
             },
@@ -515,6 +522,7 @@ class SettingsViewModel(
                 ProviderHealthStatus.Disabled -> "未配置"
                 ProviderHealthStatus.MissingApiKey -> "缺少 API Key"
                 ProviderHealthStatus.MissingBaseUrl -> "缺少 Base URL"
+                ProviderHealthStatus.MissingOfflineModel -> "缺少离线语音包"
                 ProviderHealthStatus.SystemUnavailable -> "系统 TTS 不可用"
             },
         )
